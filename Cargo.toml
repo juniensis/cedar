@@ -1,0 +1,9 @@
+[package]
+name = "cedar"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jude Peel <judepeel.dev@gmail.com>"]
+repository = "https://github.com/jude-peel/cedar"
+
+
+[dependencies]

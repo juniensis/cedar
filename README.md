@@ -1,3 +1,3 @@
 # Cedar
-## A cargo-like way to manage C projects.
+## A stripped-down Cargo clone to manage C projects.
 

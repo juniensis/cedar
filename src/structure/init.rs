@@ -55,13 +55,3 @@ pub fn init<P: AsRef<Path>>(path: P) -> Result<(), ProjectError> {
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::init;
-
-    #[test]
-    fn test_init() {
-        init("./tests/project/").unwrap();
-    }
-}

@@ -156,7 +156,27 @@ impl Args {
 
                 Ok(())
             }
-            Commands::Help => todo!(),
+            Commands::Help => {
+                help();
+                Ok(())
+            }
         }
     }
+}
+
+pub fn help() {
+    println!(
+        "
+  A C project manager.
+
+  \x1b[1;32mUsage:\x1b[0m cedar [COMMAND] [OPTIONS]
+
+  \x1b[1;32mCommands:\x1b[0m
+    \x1b[1m new      \x1b[0m Creates a new directory with the name/path given and 
+                    initializes it as a project.
+    \x1b[1m init     \x1b[0m Creates a new project in the current working directory.
+    \x1b[1m build    \x1b[0m Compiles the project.
+    \x1b[1m run      \x1b[0m Compiles then runs the project.
+"
+    );
 }

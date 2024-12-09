@@ -25,18 +25,16 @@ pub fn init<P: AsRef<Path>>(path: P) -> Result<(), ProjectError> {
         return Err(ProjectError::NonEmptyPath(format!("{:?}", path)));
     }
 
-    let (src, include, build, cedar) = (
+    let (src, include, build) = (
         path.join("src/"),
         path.join("include/"),
         path.join("build/"),
-        path.join(".cedar/"),
     );
 
     // Create src, include, build, and .cedar directories.
     fs::create_dir(&src)?;
     fs::create_dir(&include)?;
     fs::create_dir(&build)?;
-    fs::create_dir(&cedar)?;
 
     // Create default main.c file in src.
     let hello_world =

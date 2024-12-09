@@ -12,7 +12,7 @@ pub struct Manifest {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Meta {
     pub name: String,
-    pub version: Option<String>,
+    pub version: String,
     pub description: Option<String>,
 }
 
@@ -45,7 +45,7 @@ impl Manifest {
         Manifest {
             meta: Meta {
                 name: String::new(),
-                version: Some(String::from("0.1.0")),
+                version: String::from("0.1.0"),
                 description: None,
             },
             build: Build {

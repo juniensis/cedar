@@ -1,11 +1,4 @@
-use std::{
-    error::Error,
-    fmt::Display,
-    io,
-    path::{Path, PathBuf},
-};
-
-use crate::structure::manifest::Manifest;
+use std::{error::Error, fmt::Display, io};
 
 /// A custom error type for errors when building a project.
 ///
@@ -47,33 +40,5 @@ impl Error for ProjectError {}
 impl From<io::Error> for ProjectError {
     fn from(err: io::Error) -> Self {
         ProjectError::IoError(err)
-    }
-}
-
-pub struct Project {
-    manifest: Manifest,
-    path: PathBuf,
-}
-
-impl Project {
-    /// Used for building a project from an already initialized directory.
-    ///
-    /// # Arguments
-    ///
-    /// * 'path' - A representation of the path containing the project, can
-    ///         be any type that can be coerced into a path.
-    ///         
-    pub fn build<P: AsRef<Path>>(path: P) -> Result<Self, ProjectError> {
-        let path = path.as_ref();
-
-        if !path.exists() {
-            return Err(ProjectError::InvalidPath(format!("{:?}", path)));
-        }
-
-        if !path.with_file_name("cedar.toml").exists() {
-            return Err(ProjectError::InvalidManifest);
-        }
-
-        todo!()
     }
 }

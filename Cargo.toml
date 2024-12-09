@@ -9,4 +9,3 @@ repository = "https://github.com/jude-peel/cedar"
 [dependencies]
 serde = { version = "1.0.215", features = ["derive"] }
 toml = "0.8.19"
-crc32fast = "1.4.2"

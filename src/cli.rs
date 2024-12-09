@@ -25,12 +25,32 @@ impl Display for CliError {
 
 impl Error for CliError {}
 
+/// A structure for holding the command line arguments.
+///
+/// # Fields
+///
+/// * 'command' - An instance of the Command enum representing what part of the
+///         program to execute.
+/// * 'path' - An optional PathBuf pointing to the project directory. It is
+///         optional because only the new command requires a path, the rest
+///         work in the current working directory.
+///
 #[derive(Clone)]
 pub struct Args {
     pub command: Commands,
     pub path: Option<PathBuf>,
 }
 
+/// An enum for holding the possible commands.
+///
+/// # Members
+///
+/// * 'Init' -  Initializes a project in the current directory.
+/// * 'New' - Intializes a project in the given relative or absolute path.
+/// * 'Build' - Compiles and links all the fiels in src and include.
+/// * 'Run' - Compiles/links and runs the program.
+/// * 'Help' - Displays the help message.
+///
 #[derive(Clone, Copy)]
 pub enum Commands {
     Init,
@@ -41,6 +61,7 @@ pub enum Commands {
 }
 
 impl Args {
+    // Gets the environment arguments and returns an Args struct with them.
     pub fn get() -> Result<Self, CliError> {
         let mut cli = Self {
             command: Commands::Help,

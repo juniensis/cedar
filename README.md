@@ -1,5 +1,5 @@
 # Cedar
-### A stripped-down Cargo-like C project manager.
+### A Cargo-like C project manager.
 Cedar can create, compile, and run C projects. 
 
 ### Usage
@@ -9,6 +9,6 @@ program, and run compiles then executes the program.
 
 Upon initializing a new Cedar project, there will be 3 directories generated, src, build, and include, 
 as well as a cedar.toml manifest file. All C code in src or include will be linked together when the 
-project is ran.
+project is compiled.
 
 

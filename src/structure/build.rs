@@ -47,17 +47,13 @@ pub fn build<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
 
     let mut compiler_args: Vec<String> = Vec::new();
 
-    let src_files = fs::read_dir(src_path)?;
-    let include_files = fs::read_dir(include_path)?;
+    let mut src_files = recursive_file_search(src_path)?;
+    let include_files = recursive_file_search(include_path)?;
 
-    for files in src_files.chain(include_files) {
-        compiler_args.push(
-            files?
-                .path()
-                .to_str()
-                .expect("Error: Failed to convert path to string while building.")
-                .to_owned(),
-        );
+    src_files.extend_from_slice(&include_files);
+
+    for file in src_files {
+        compiler_args.push(file);
     }
 
     let output_path = build_path.join(manifest.meta.name);
@@ -80,4 +76,24 @@ pub fn build<P: AsRef<Path>>(path: P) -> Result<(), Box<dyn Error>> {
     println!("\t\x1b[1;32mFinished\x1b[0m in {:.2?}\n", elapsed);
 
     Ok(())
+}
+
+fn recursive_file_search<P: AsRef<Path>>(path: P) -> Result<Vec<String>, std::io::Error> {
+    let mut result = Vec::new();
+    for file in fs::read_dir(path)? {
+        let file_path = file?.path();
+
+        if file_path.is_dir() {
+            result.extend_from_slice(&recursive_file_search(file_path)?);
+        } else {
+            result.push(
+                file_path
+                    .to_str()
+                    .expect("Error: Failed to convert path to string.")
+                    .to_owned(),
+            )
+        }
+    }
+
+    Ok(result)
 }

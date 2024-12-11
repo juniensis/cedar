@@ -1,7 +1,4 @@
-use crate::{
-    build::build,
-    structure::{init::init, manifest::Manifest},
-};
+use crate::structure::{build::build, init::init, manifest::Manifest};
 use std::{env, error::Error, fmt::Display, fs, path::PathBuf, process};
 
 #[derive(Debug)]
@@ -39,6 +36,7 @@ impl Error for CliError {}
 pub struct Args {
     pub command: Commands,
     pub path: Option<PathBuf>,
+    pub flags: Vec<Flags>,
 }
 
 /// An enum for holding the possible commands.
@@ -60,12 +58,24 @@ pub enum Commands {
     Help,
 }
 
+/// An enum for holding possible flags.
+///
+/// # Members
+///
+/// * 'Git' - Initalizes a git repositiory in the project.
+///
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Flags {
+    Git,
+}
+
 impl Args {
     // Gets the environment arguments and returns an Args struct with them.
     pub fn get() -> Result<Self, CliError> {
         let mut cli = Self {
             command: Commands::Help,
             path: None,
+            flags: Vec::new(),
         };
 
         let mut args = env::args().skip(1).enumerate();
@@ -90,9 +100,13 @@ impl Args {
                 (0, "build") => cli.command = Commands::Build,
                 (0, "run") => cli.command = Commands::Run,
                 (0, "help") => cli.command = Commands::Help,
-                (_, _) => {
+                (0, _) => {
                     return Err(CliError::InvalidCommand);
                 }
+                (_, "--git") | (_, "-g") => {
+                    cli.flags.push(Flags::Git);
+                }
+                (_, _) => {}
             }
         }
 
@@ -101,80 +115,19 @@ impl Args {
     pub fn exec(&self) -> Result<(), Box<dyn Error>> {
         match self.command {
             Commands::Init => {
-                let cwd = env::current_dir()?;
-
-                println!("\n\t\x1b[32mCreating \x1b[0mCedar project here");
-                println!("\t  -> Generating directories and manifest");
-
-                init(&cwd)?;
-
-                println!("\t  -> Initializing git \n");
-
-                process::Command::new("git")
-                    .args(["init", "-b", "main"])
-                    .stdout(process::Stdio::null())
-                    .spawn()
-                    .expect("Git failed to execute, is it installed?")
-                    .wait()?;
-
-                println!("\t\x1b[1;32mFinished\x1b[0m");
+                self.init()?;
                 Ok(())
             }
             Commands::New => {
-                println!(
-                    "\n\t\x1b[1;32mCreating \x1b[0m{:?} ({:?})",
-                    self.path.as_ref().unwrap().file_name().unwrap(),
-                    self.path.as_ref().unwrap()
-                );
-                println!("\t  -> Generating directories and manifest.");
-
-                let path = self.path.clone().unwrap();
-
-                let path_str = path.clone().into_os_string();
-
-                if !path.is_dir() {
-                    fs::create_dir_all(&path)?;
-                }
-
-                init(&path)?;
-
-                println!("\t  -> Initializing git \n");
-
-                process::Command::new("git")
-                    .args(["init", path_str.to_str().unwrap(), "-b", "main"])
-                    .stdout(process::Stdio::null())
-                    .spawn()
-                    .expect("Git failed to execute, is it installed?")
-                    .wait()?;
-
-                println!("\t\x1b[1;32mFinished\x1b[0m");
+                self.create_new()?;
                 Ok(())
             }
             Commands::Build => {
-                let cwd = env::current_dir()?;
-                build(cwd)?;
+                self.build()?;
                 Ok(())
             }
             Commands::Run => {
-                let path = env::current_dir()?;
-
-                let manifest_path = path.join("cedar.toml");
-                let build_path = path.join("build/");
-
-                let manifest_file = fs::read_to_string(manifest_path)?;
-                let manifest = Manifest::parse(&manifest_file)?;
-
-                let output_path = build_path.join(manifest.meta.name);
-
-                build(&path)?;
-
-                let output_str = output_path.to_str().unwrap();
-
-                process::Command::new(output_str)
-                    .spawn()
-                    .expect("Error: Could not run executable.")
-                    .wait()?;
-
+                self.run()?;
                 Ok(())
             }
             Commands::Help => {
@@ -182,6 +135,91 @@ impl Args {
                 Ok(())
             }
         }
+    }
+    /// Initializes a new project in the current working directory.
+    fn init(&self) -> Result<(), Box<dyn Error>> {
+        let cwd = env::current_dir()?;
+
+        println!("\n\t\x1b[32mCreating \x1b[0mCedar project here");
+        println!("\t  -> Generating directories and manifest");
+
+        init(&cwd)?;
+
+        if self.flags.contains(&Flags::Git) {
+            println!("\t  -> Initializing git \n");
+
+            process::Command::new("git")
+                .args(["init", "-b", "main"])
+                .stdout(process::Stdio::null())
+                .spawn()
+                .expect("Git failed to execute, is it installed?")
+                .wait()?;
+        }
+
+        println!("\t\x1b[1;32mFinished\x1b[0m");
+        Ok(())
+    }
+    /// Creates a new project at the given directory.
+    fn create_new(&self) -> Result<(), Box<dyn Error>> {
+        println!(
+            "\n\t\x1b[1;32mCreating \x1b[0m{:?} ({:?})",
+            self.path.as_ref().unwrap().file_name().unwrap(),
+            self.path.as_ref().unwrap()
+        );
+        println!("\t  -> Generating directories and manifest.");
+
+        let path = self.path.clone().unwrap();
+
+        let path_str = path.clone().into_os_string();
+
+        if !path.is_dir() {
+            fs::create_dir_all(&path)?;
+        }
+
+        init(&path)?;
+
+        if self.flags.contains(&Flags::Git) {
+            println!("\t  -> Initializing git \n");
+
+            process::Command::new("git")
+                .args(["init", path_str.to_str().unwrap(), "-b", "main"])
+                .stdout(process::Stdio::null())
+                .spawn()
+                .expect("Git failed to execute, is it installed?")
+                .wait()?;
+        }
+
+        println!("\t\x1b[1;32mFinished\x1b[0m");
+        Ok(())
+    }
+    /// Compiles the project.
+    fn build(&self) -> Result<(), Box<dyn Error>> {
+        let cwd = env::current_dir()?;
+        build(cwd)?;
+        Ok(())
+    }
+    /// Compiles (if needed) and then runs the project.
+    fn run(&self) -> Result<(), Box<dyn Error>> {
+        let path = env::current_dir()?;
+
+        let manifest_path = path.join("cedar.toml");
+        let build_path = path.join("build/");
+
+        let manifest_file = fs::read_to_string(manifest_path)?;
+        let manifest = Manifest::parse(&manifest_file)?;
+
+        let output_path = build_path.join(manifest.meta.name);
+
+        build(&path)?;
+
+        let output_str = output_path.to_str().unwrap();
+
+        process::Command::new(output_str)
+            .spawn()
+            .expect("Error: Could not run executable.")
+            .wait()?;
+
+        Ok(())
     }
 }
 

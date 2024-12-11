@@ -1,7 +1,7 @@
 # Cedar
-### A Cargo-like C project manager.
+### A C project manager.
 Cedar can create, compile, and run C projects. 
-
+![Example of usage.](https://github.com/jude-peel/cedar/blob/4e23e52bc40e7984f21771b450c063ca0df546b1/usage/usage.gif)
 ### Goals
 - [ ] Clang support.
 - [x] Recursive file searching.

@@ -1,6 +1,14 @@
 use crate::structure::{build::build, init::init, manifest::Manifest};
 use std::{env, error::Error, fmt::Display, fs, path::PathBuf, process};
 
+/// Custom error type for command line related errors.
+///
+/// # Members
+///
+/// * 'InvalidCommand' - Raised when a command is given but is invalid.
+/// * 'MissingArgument' - Raised when a command is given that expects an
+///         argument but no argument is given.
+///         
 #[derive(Debug)]
 pub enum CliError {
     InvalidCommand,

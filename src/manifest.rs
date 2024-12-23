@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use toml::{self};
 
-use super::project::ProjectError;
+use crate::error::ManifestError;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Manifest {
@@ -24,19 +24,19 @@ pub struct Build {
 
 impl Manifest {
     #[inline]
-    pub fn parse(manifest: &str) -> Result<Self, ProjectError> {
+    pub fn parse(manifest: &str) -> Result<Self, ManifestError> {
         let parsed = match toml::from_str(manifest) {
             Ok(manifest) => manifest,
-            Err(_) => return Err(ProjectError::InvalidManifest),
+            Err(e) => return Err(ManifestError::InvalidManifest(e)),
         };
 
         Ok(parsed)
     }
     #[inline]
-    pub fn as_string(&self) -> Result<String, ProjectError> {
+    pub fn as_string(&self) -> Result<String, ManifestError> {
         let serialized = match toml::ser::to_string(self) {
             Ok(manifest) => manifest,
-            Err(_) => return Err(ProjectError::InvalidManifest),
+            Err(e) => return Err(ManifestError::SerializeError(e)),
         };
 
         Ok(serialized)
@@ -59,21 +59,5 @@ impl Manifest {
 impl Default for Manifest {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use super::Manifest;
-
-    #[test]
-    fn test_deserialize() {
-        let file = fs::read_to_string("./data/cedar.toml").unwrap();
-
-        let parsed = Manifest::parse(&file).unwrap();
-
-        println!("{:?}", parsed);
     }
 }

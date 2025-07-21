@@ -1,6 +1,9 @@
 # Cedar
+A simple C build system for small projects.
 
-## A C project manager
+I only really use C for writing small tools or learning about the language.
+So, the majority of build systems are too powerful for my use case. Just compiling and
+running the binary would likely be just fine, but whats the fun in that?
 
 Cedar can create, compile, and run C projects.
 ![Example of usage.](https://github.com/jude-peel/cedar/blob/4e23e52bc40e7984f21771b450c063ca0df546b1/usage/usage.gif)

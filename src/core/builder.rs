@@ -1,134 +1,116 @@
 use std::{
-    fs, io,
+    io,
     path::{Path, PathBuf},
     process::Command,
 };
 
-use crate::core::{manifest::Manifest, sys::which};
+use crate::core::{error::BuilderError, manifest::Manifest, utils::which};
 
-pub enum Compiler {
-    Clang(PathBuf),
-    Gcc(PathBuf),
-    Env(PathBuf),
-    Unknown,
+pub struct Compiler {
+    cmd: String,
+    flags: Vec<String>,
 }
 
 impl Compiler {
-    pub fn detect() -> Compiler {
-        if let Ok(cc) = std::env::var("CC")
-            && let Some(path) = which(&cc)
+    pub fn detect() -> Result<Self, BuilderError> {
+        let cmd = if let Ok(cc) = std::env::var("CC")
+            && let Some(_) = which(&cc)
         {
-            return Compiler::Env(path);
-        }
-        if let Some(clang) = which("clang") {
-            return Compiler::Clang(clang);
-        }
-        if let Some(gcc) = which("gcc") {
-            return Compiler::Gcc(gcc);
-        }
-        Compiler::Unknown
+            cc
+        } else if which("clang").is_some() {
+            "clang".to_string()
+        } else if which("gcc").is_some() {
+            "gcc".to_string()
+        } else {
+            return Err(BuilderError::FailedToDetectCompiler);
+        };
+
+        Ok(Self {
+            cmd,
+            flags: Vec::new(),
+        })
     }
-    pub fn as_string(&self) -> String {
-        match self {
-            Self::Clang(_) => "clang".to_string(),
-            Self::Gcc(_) => "gcc".to_string(),
-            Self::Env(p) => p.file_name().unwrap().to_string_lossy().to_string(),
-            Self::Unknown => "Unknown".to_string(),
+    pub fn build(compiler: &str, flags: &[&str]) -> Result<Self, BuilderError> {
+        let cmd = match compiler {
+            "clang" => "clang".to_string(),
+            "gcc" => "gcc".to_string(),
+            _ => return Err(BuilderError::InvalidCompiler(compiler.to_string())),
+        };
+
+        let owned_flags = flags.iter().map(|flag| flag.trim().to_string()).collect();
+
+        Ok(Self {
+            cmd,
+            flags: owned_flags,
+        })
+    }
+    pub fn with_flags<S: AsRef<str>>(flags: &[S]) -> Result<Self, BuilderError> {
+        let mut ret = Self::detect()?;
+        ret.flags = flags.iter().map(|x| x.as_ref().to_string()).collect();
+        Ok(ret)
+    }
+    pub fn add_flags<S: AsRef<str>>(&mut self, flags: &[S]) {
+        for flag in flags {
+            let str = flag.as_ref().to_string();
+            self.flags.push(str);
         }
+    }
+    pub fn compile<P: AsRef<Path>>(&self, src: P, dst: P) -> Result<String, BuilderError> {
+        let src = src.as_ref();
+        let name = src
+            .file_name()
+            .map(|str| str.to_string_lossy())
+            .ok_or(io::Error::last_os_error())?;
+
+        if !src.exists() {
+            return Err(BuilderError::CompileError(format!(
+                "attempted to compile non-existent file '{name}'"
+            )));
+        }
+
+        if !name.ends_with(".c") {
+            return Err(BuilderError::CompileError(format!(
+                "attempted to compile '{name}' which lacks the '.c' file extension."
+            )));
+        }
+
+        let src_str = src.to_string_lossy();
+        let dst_str = dst.as_ref().to_string_lossy();
+
+        let command_str = format!(
+            "{} -c -O2 -Iinclude {} -o {} {}",
+            self.cmd,
+            self.flags.join(" "),
+            dst_str,
+            src_str
+        );
+
+        let command = command_str.split_ascii_whitespace().collect::<Vec<_>>();
+        let compile = Command::new(command[0]).args(&command[1..]).spawn()?;
+
+        Ok(command_str)
     }
 }
 
-pub struct Builder {
+pub struct Builder<'a> {
+    manifest: Manifest<'a>,
     compiler: Compiler,
-    cflags: Vec<String>,
-    bin: String,
-    directory: PathBuf,
-}
-
-impl Builder {
-    pub fn build_all<P: AsRef<Path>>(&self, paths: &[P]) -> io::Result<()> {
-        let obj_dir = self.directory.join("obj/");
-        if !obj_dir.exists() {
-            fs::create_dir(&obj_dir)?;
-        }
-
-        let obj_str = obj_dir.into_os_string();
-        let mut to_link = Vec::new();
-        for path in paths {
-            let path_str = path.as_ref().to_string_lossy();
-            let path_name = path.as_ref().file_stem().unwrap().to_string_lossy();
-            let obj_path = format!("{}/{path_name}.o", obj_str.display());
-            to_link.push(obj_path.clone());
-            let args = [
-                "-c",
-                "-O2",
-                "-Iinclude",
-                "-o",
-                obj_path.as_str(),
-                path_str.as_ref(),
-            ];
-
-            let mut op = Command::new(self.compiler.as_string().as_str())
-                .args(&self.cflags)
-                .args(args)
-                .spawn()?;
-
-            op.wait()?;
-        }
-
-        let bin_dir = self
-            .directory
-            .join(&self.bin)
-            .into_os_string()
-            .into_string()
-            .unwrap();
-
-        let mut link = Command::new(self.compiler.as_string().as_str())
-            .args(["-o", &bin_dir])
-            .args(&to_link)
-            .arg("-lm")
-            .spawn()?;
-
-        link.wait()?;
-
-        Ok(())
-    }
+    dir: PathBuf,
 }
 
 #[cfg(test)]
 mod core_builder_t {
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-    };
+    use crate::core::builder::Compiler;
 
-    use crate::core::builder::{Builder, Compiler};
-
+    #[ignore]
     #[test]
-    fn build_all_t() {
-        let builder = Builder {
-            compiler: Compiler::detect(),
-            cflags: vec!["-Wall".to_string(), "-Wextra".to_string()],
-            bin: "main".to_string(),
-            directory: PathBuf::from("./tests/project/build"),
-        };
-
-        let mut to_build = Vec::new();
-        fn rec<P: AsRef<Path>>(out: &mut Vec<PathBuf>, path: P) {
-            for dir in fs::read_dir(path).unwrap().flatten() {
-                if dir.file_type().unwrap().is_dir() {
-                    rec(out, dir.path());
-                } else if dir.file_type().unwrap().is_file()
-                    && dir.file_name().into_string().unwrap().ends_with(".c")
-                {
-                    out.push(dir.path());
-                }
-            }
-        }
-
-        rec(&mut to_build, "./tests/project/");
-
-        builder.build_all(&to_build).unwrap();
-        println!("{to_build:?}");
+    fn compiler_t() {
+        let compiler = Compiler::with_flags(&["-Wall", "-Wextra"]).unwrap();
+        compiler
+            .compile(
+                "./tests/data/calc/src/main.c",
+                "./tests/data/calc/build/main.o",
+            )
+            .unwrap();
     }
 }

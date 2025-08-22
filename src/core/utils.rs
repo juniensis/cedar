@@ -1,5 +1,7 @@
-//! Wrappers for 'std::process::Command' operations.
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 pub fn which(c: &str) -> Option<PathBuf> {
     let cmd = Command::new("which").arg(c).output().ok()?;
@@ -8,11 +10,15 @@ pub fn which(c: &str) -> Option<PathBuf> {
     if out.exists() { Some(out) } else { None }
 }
 
+pub(crate) fn path_to_string<P: AsRef<Path>>(path: P) -> String {
+    path.as_ref().to_string_lossy().to_string()
+}
+
 #[cfg(test)]
 mod core_sys_t {
     use std::path::PathBuf;
 
-    use crate::core::sys::which;
+    use crate::core::utils::which;
 
     #[test]
     fn which_t() {

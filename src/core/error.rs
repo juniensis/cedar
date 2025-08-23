@@ -45,6 +45,8 @@ pub enum BuilderError {
     InvalidCompiler(String),
     CompileError(String),
     IoError(io::Error),
+    NoManifest(String),
+    ManifestError(ManifestError),
 }
 
 impl Display for BuilderError {
@@ -60,6 +62,8 @@ impl Display for BuilderError {
             ),
             Self::CompileError(e) => writeln!(f, "BuilderError: Failed to compile, {e}"),
             Self::IoError(e) => writeln!(f, "{e}"),
+            Self::NoManifest(s) => writeln!(f, "BuilderError: No Cedar manifest in the path {s}."),
+            Self::ManifestError(e) => write!(f, "BuilderError: {e}"),
         }
     }
 }
@@ -69,5 +73,11 @@ impl Error for BuilderError {}
 impl From<io::Error> for BuilderError {
     fn from(err: io::Error) -> Self {
         Self::IoError(err)
+    }
+}
+
+impl From<ManifestError> for BuilderError {
+    fn from(err: ManifestError) -> Self {
+        Self::ManifestError(err)
     }
 }

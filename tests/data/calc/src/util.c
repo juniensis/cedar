@@ -7,3 +7,5 @@ void trim_newline(char *s) {
     s[len - 1] = '\0';
   }
 }
+
+void add(int a) { a = 1; }

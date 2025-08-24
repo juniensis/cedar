@@ -1,253 +1,266 @@
 use std::{
-    ffi::c_void,
-    fmt::{Debug, Display},
     fs, io,
-    ops::Deref,
     path::{Path, PathBuf},
     rc::Rc,
+    time::UNIX_EPOCH,
 };
 
 use ahash::AHashMap;
 
-use crate::core::utils::memchr;
+use crate::core::utils::{findbyte, fxhash, resolve_path, walk_dir};
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum CFile {
-    Header { name: Rc<str>, path: Rc<Path> },
-    Source { name: Rc<str>, path: Rc<Path> },
+// Recompile every changed file, and every file that depends on it if the
+// header has changed.
+#[derive(Debug)]
+pub struct CSource {
+    path: Rc<Path>,
+    modified: u64,
+    content: u64,
 }
 
-pub struct TargetNode {
-    data: CFile,
-    id: usize,
-    depends: Vec<usize>,
+#[derive(Debug)]
+pub struct CHeader {
+    path: Rc<Path>,
+    modified: u64,
+    content: u64,
+    dependents: Vec<Rc<Path>>,
 }
 
-pub struct DependGraph {
-    edges: AHashMap<CFile, Vec<CFile>>,
+pub struct DependencyGraph {
+    sources: Vec<CSource>,
+    headers: Vec<CHeader>,
+    dir: PathBuf,
 }
 
-impl DependGraph {
-    pub fn build<P: AsRef<Path>>(path: P) -> Self {
-        let mut edges = AHashMap::new();
+impl DependencyGraph {
+    pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let path = path.as_ref();
+        let build_dir = path.join("build");
+        let files = walk_dir(path)?;
+        let files_mod = files.iter().map(|pt| {
+            let meta = &pt.metadata().unwrap();
+            let modified = meta
+                .modified()
+                .unwrap()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            (pt, modified)
+        });
 
-        // Map file -> dependencies.
-        fn rec<P: AsRef<Path>>(out: &mut AHashMap<CFile, Vec<CFile>>, p: P) -> io::Result<()> {
-            let path = p.as_ref();
-            for dir in path.read_dir()?.flatten() {
-                if dir.file_type()?.is_dir() {
-                    rec(out, dir.path())?;
-                } else if dir.file_type()?.is_file() {
-                    let path = dir.path();
-                    if let Some(name) = path.file_name().map(|name| name.to_string_lossy())
-                        && (name.ends_with(".c") || name.ends_with(".h"))
-                    {
-                        extract_includes(Rc::from(name), path, out)?;
-                    }
-                }
-            }
-            Ok(())
-        }
+        let mut sourcemap = AHashMap::new();
+        let mut headermap = AHashMap::new();
 
-        rec(&mut edges, path).unwrap();
-
-        // Flip map to dependency -> depended on by.
-        let mut flipped: AHashMap<CFile, Vec<CFile>> = AHashMap::new();
-
-        for (dependent, dependencies) in edges.into_iter() {
-            for dependency in dependencies {
-                flipped
-                    .entry(dependency)
-                    .and_modify(|v| v.push(dependent.clone()))
-                    .or_insert(vec![dependent.clone()]);
-            }
-        }
-
-        Self { edges: flipped }
-    }
-}
-
-impl Display for CFile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Header { name, path } => write!(f, "{name}"),
-            Self::Source { name, path } => write!(f, "{name}"),
-        }
-    }
-}
-
-impl Debug for DependGraph {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (k, v) in self.edges.iter() {
-            writeln!(f, "{k}:")?;
-            for dep in v {
-                writeln!(f, "  -> {dep}")?;
+        for (file, modified) in files_mod {
+            if file.extension().is_some_and(|ex| ex == "c") {
+                let bytes = fs::read(file)?;
+                let rcpath = Rc::<Path>::from(file.as_ref());
+                let content = fxhash(&bytes);
+                sourcemap.insert(
+                    rcpath.clone(),
+                    CSource {
+                        path: rcpath,
+                        modified,
+                        content,
+                    },
+                );
+            } else if file.extension().is_some_and(|ex| ex == "h") {
+                let bytes = fs::read(file)?;
+                let rcpath = Rc::<Path>::from(file.as_ref());
+                let content = fxhash(&bytes);
+                headermap.insert(
+                    rcpath.clone(),
+                    CHeader {
+                        path: rcpath,
+                        modified,
+                        content,
+                        dependents: Vec::new(),
+                    },
+                );
             }
         }
-        Ok(())
-    }
-}
 
-// +-----------------+
-// | Include parsing |
-// +-----------------+
-
-#[inline(always)]
-pub fn _memchr(ptr: *const u8, c: u8, len: usize) -> *const u8 {
-    unsafe { memchr(ptr as *const c_void, c as i32, len) as *const u8 }
-}
-
-fn extract_includes<P: AsRef<Path>>(
-    name: Rc<str>,
-    path: P,
-    out: &mut AHashMap<CFile, Vec<CFile>>,
-) -> io::Result<()> {
-    let buf = fs::read(&path)?;
-    let mut ptr = buf.as_ptr();
-    let bound = unsafe { ptr.add(buf.len()) };
-    let mut start = ptr;
-    let mut state = 0;
-    unsafe {
-        while ptr < bound {
-            match state {
-                0 => {
-                    ptr = _memchr(ptr, b'#', bound as usize - ptr as usize);
-                    if ptr.is_null() {
-                        break;
-                    }
-                    if (bound as usize - ptr as usize) > 8
-                        && *(ptr as *const [u8; 8]) == *b"#include"
-                    {
-                        ptr = ptr.add(8);
-                        state = 1;
-                    }
-                }
-                1 => {
-                    while ptr < bound {
-                        let byte = *ptr;
-                        if byte == b'\\' {
-                            ptr = ptr.add(2);
-                            continue;
-                        } else if byte == b'\n' {
-                            state = 0;
-                            break;
-                        } else if byte == b'"' {
-                            ptr = ptr.add(1);
-                            start = ptr;
-                            state = 2;
-                            break;
-                        }
-                        ptr = ptr.add(1);
-                    }
-                }
-                2 => {
-                    while ptr < bound {
-                        let byte = *ptr;
-                        if byte == b'\\' {
-                            ptr = ptr.add(2);
-                            continue;
-                        } else if byte == b'\n' {
-                            state = 0;
-                            break;
-                        } else if byte == b'"' {
-                            let len = ptr as usize - start as usize;
-                            let include: Rc<str> = Rc::from(str::from_utf8_unchecked(
-                                std::slice::from_raw_parts(start, len),
-                            ));
-
-                            let include_path = match resolve_header_path(
-                                path.as_ref(),
-                                include.as_ref(),
-                            ) {
-                                Ok(p) => p,
-                                Err(p) => {
-                                    eprintln!(
-                                        "Warning: invalid include statement in {name}.\n Cannot find {p:?}"
-                                    );
-                                    state = 0;
-                                    break;
-                                }
-                            };
-
-                            let include_file = CFile::Header {
-                                name: Rc::from(include.split("/").last().unwrap()),
-                                path: Rc::from(include_path.as_ref()),
-                            };
-                            out.entry(if name.ends_with(".c") {
-                                CFile::Source {
-                                    name: name.clone(),
-                                    path: Rc::from(path.as_ref()),
-                                }
+        let dfiles = walk_dir(&build_dir)?;
+        let mut alldeps = Vec::with_capacity(dfiles.len());
+        for pt in dfiles {
+            if pt.extension().is_some_and(|ex| ex == "d") {
+                let contents = fs::read(&pt)?;
+                let mut ptr = contents.as_ptr();
+                let end = unsafe { ptr.add(contents.len()) };
+                let mut deps: Vec<Rc<Path>> = Vec::new();
+                while let Some((fs, _)) = findbyte(ptr, b' ', end) {
+                    ptr = fs;
+                    unsafe {
+                        let mut rdr;
+                        let start = loop {
+                            rdr = *ptr;
+                            if rdr < 33 || rdr == b'\\' {
+                                ptr = ptr.add(1);
+                                continue;
                             } else {
-                                CFile::Header {
-                                    name: name.clone(),
-                                    path: Rc::from(path.as_ref()),
-                                }
-                            })
-                            .and_modify(|v| v.push(include_file.clone()))
-                            .or_insert(vec![include_file]);
-                            state = 0;
+                                break ptr;
+                            }
+                        };
+                        if let Some((end, len)) = findbyte(start, b' ', end) {
+                            let slice = std::slice::from_raw_parts(start, len);
+                            let str = resolve_path(str::from_utf8_unchecked(slice).trim());
+                            deps.push(Rc::from(str.as_ref()));
+                            ptr = end.add(1);
+                        } else {
                             break;
                         }
-                        ptr = ptr.add(1);
                     }
                 }
-                _ => state = 0,
+                let last = resolve_path(
+                    unsafe {
+                        str::from_utf8_unchecked(std::slice::from_raw_parts(
+                            ptr,
+                            end as usize - ptr as usize,
+                        ))
+                    }
+                    .trim(),
+                );
+                deps.push(Rc::from(last.as_ref()));
+                alldeps.push(deps)
             }
-            ptr = ptr.add(1)
         }
+
+        for deps in &alldeps {
+            for header in deps[1..].iter() {
+                if let Some(head) = headermap.get_mut(header) {
+                    head.dependents.push(deps[0].clone());
+                }
+            }
+        }
+
+        let mut headers = Vec::new();
+        let mut sources = Vec::new();
+        let mut ser = String::new();
+
+        for (key, entry) in headermap {
+            let pt = key.to_string_lossy();
+            ser.push_str(&format!(
+                "<{pt}\x1f{}\x1f{}\n",
+                entry.content, entry.modified
+            ));
+            for dep in &entry.dependents {
+                let dt = dep.to_string_lossy();
+                ser.push_str(&format!("+{dt}\n"));
+            }
+            headers.push(entry)
+        }
+        for (key, entry) in sourcemap {
+            let pt = key.to_string_lossy();
+            ser.push_str(&format!(
+                ">{pt}\x1f{}\x1f{}\n",
+                entry.content, entry.modified
+            ));
+            sources.push(entry)
+        }
+
+        fs::write(build_dir.join("cedar.d"), ser.as_bytes())?;
+        Ok(Self {
+            headers,
+            sources,
+            dir: path.to_path_buf(),
+        })
     }
+    pub fn read<P: AsRef<Path>>(dpath: P) -> io::Result<Self> {
+        let bytes = fs::read(dpath)?;
 
-    Ok(())
-}
+        let mut xptr = bytes.as_ptr();
+        let mut yptr = xptr;
+        let mut xrdr: u8;
+        let mut yrdr;
+        let end = unsafe { xptr.add(bytes.len()) };
 
-fn resolve_header_path<P: AsRef<Path>>(
-    source_path: P,
-    include_statement: &str,
-) -> Result<PathBuf, &str> {
-    let components = include_statement.split("/").collect::<Vec<_>>();
-    let source_parent = match source_path.as_ref().parent() {
-        Some(p) => p.to_path_buf(),
-        None => return Err(include_statement),
-    };
+        //let mut headers = Vec::new();
+        //let mut source = Vec::new();
 
-    if components.len() == 1 || components[0] == "." {
-        match fs::canonicalize(source_parent.join(include_statement)) {
-            Ok(p) => Ok(p),
-            Err(_) => Err(include_statement),
-        }
-    } else if components[0] == ".." {
-        let mut adjusted = source_parent.clone();
-        for (par, &comp) in source_parent.ancestors().zip(components.iter()) {
-            if comp == ".." {
-                adjusted = par.parent().unwrap().to_path_buf();
-            } else {
-                adjusted = adjusted.join(comp);
-                break;
+        while let Some((newline, _)) = findbyte(xptr, b'\n', end) {
+            unsafe {
+                xptr = newline;
+                yrdr = *yptr;
+                match yrdr {
+                    b'<' => {
+                        // Right now, xptr is at the end of the line, and yptr
+                        // is at the start of the line.
+                        println!("HEADER:");
+
+                        let path = if let Some((pend, plen)) = findbyte(yptr, b'\x1f', end) {
+                            let path = str::from_utf8_unchecked(std::slice::from_raw_parts(
+                                yptr.add(1),
+                                plen - 1,
+                            ));
+                            yptr = pend.add(1);
+                            Rc::<Path>::from(PathBuf::from(path).as_ref())
+                        } else {
+                            todo!()
+                        };
+                        let hash = if let Some((hend, hlen)) = findbyte(yptr, b'\x1f', end) {
+                            let hsh =
+                                str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, hlen));
+                            yptr = hend.add(1);
+                            hsh.parse::<u64>().unwrap()
+                        } else {
+                            todo!()
+                        };
+                        let modify = if let Some((mend, mlen)) = findbyte(yptr, b'\n', end) {
+                            let mdfy =
+                                str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, mlen));
+                            mdfy.parse::<u64>().unwrap()
+                        } else {
+                            todo!()
+                        };
+                    }
+                    b'+' => {
+                        let slice = std::slice::from_raw_parts(
+                            yptr.add(1),
+                            xptr as usize - yptr as usize - 1,
+                        );
+                        let str = str::from_utf8_unchecked(slice);
+                        println!("DEPENDANT: {str}");
+                    }
+                    b'>' => {
+                        println!("SOURCE:");
+                        if let Some((pend, plen)) = findbyte(yptr, b'\x1f', end) {
+                            let path = str::from_utf8_unchecked(std::slice::from_raw_parts(
+                                yptr.add(1),
+                                plen - 1,
+                            ));
+                            yptr = pend.add(1);
+                            println!("PATH: {path}");
+                        }
+                        if let Some((hend, hlen)) = findbyte(yptr, b'\x1f', end) {
+                            let hash =
+                                str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, hlen));
+                            yptr = hend.add(1);
+                            println!("HASH: {hash}");
+                        }
+                        if let Some((mend, mlen)) = findbyte(yptr, b'\n', end) {
+                            let modify =
+                                str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, mlen));
+                            println!("MOD: {modify}");
+                        }
+                    }
+                    _ => {}
+                }
+                yptr = xptr.add(1);
+                xptr = xptr.add(1);
             }
         }
-        match fs::canonicalize(&adjusted) {
-            Ok(p) => Ok(p),
-            Err(_) => Err(include_statement),
-        }
-    } else if let Some(parent) = source_path.as_ref().parent() {
-        match fs::canonicalize(parent.join(include_statement)) {
-            Ok(p) => Ok(p),
-            Err(_) => Err(include_statement),
-        }
-    } else {
-        Err(include_statement)
+
+        todo!()
     }
 }
 
 #[cfg(test)]
 mod core_dag_t {
-    use crate::core::dag::DependGraph;
+    use crate::core::dag::DependencyGraph;
 
     #[test]
     fn init_t() {
-        //let dag = DependGraph::build("/home/june/archive/repo/gcc/");
-
-        let dag = DependGraph::build("./tests/data/calc/");
+        let dag = DependencyGraph::new("./tests/data/calc/").unwrap();
+        let de = DependencyGraph::read("./tests/data/calc/build/cedar.d").unwrap();
     }
 }

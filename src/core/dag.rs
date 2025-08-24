@@ -1,5 +1,5 @@
 use std::{
-    fs, io,
+    fs, hash, io,
     path::{Path, PathBuf},
     rc::Rc,
     time::UNIX_EPOCH,
@@ -26,14 +26,22 @@ pub struct CHeader {
     dependents: Vec<Rc<Path>>,
 }
 
+#[derive(Debug)]
 pub struct DependencyGraph {
-    sources: Vec<CSource>,
-    headers: Vec<CHeader>,
+    sources: AHashMap<Rc<Path>, CSource>,
+    headers: AHashMap<Rc<Path>, CHeader>,
     dir: PathBuf,
 }
 
 impl DependencyGraph {
-    pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            sources: AHashMap::new(),
+            headers: AHashMap::new(),
+            dir: path.as_ref().to_path_buf(),
+        }
+    }
+    pub fn build<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let path = path.as_ref();
         let build_dir = path.join("build");
         let files = walk_dir(path)?;
@@ -133,11 +141,9 @@ impl DependencyGraph {
             }
         }
 
-        let mut headers = Vec::new();
-        let mut sources = Vec::new();
         let mut ser = String::new();
 
-        for (key, entry) in headermap {
+        for (key, entry) in &headermap {
             let pt = key.to_string_lossy();
             ser.push_str(&format!(
                 "<{pt}\x1f{}\x1f{}\n",
@@ -147,46 +153,68 @@ impl DependencyGraph {
                 let dt = dep.to_string_lossy();
                 ser.push_str(&format!("+{dt}\n"));
             }
-            headers.push(entry)
         }
-        for (key, entry) in sourcemap {
+        for (key, entry) in &sourcemap {
             let pt = key.to_string_lossy();
             ser.push_str(&format!(
                 ">{pt}\x1f{}\x1f{}\n",
                 entry.content, entry.modified
             ));
-            sources.push(entry)
         }
 
         fs::write(build_dir.join("cedar.d"), ser.as_bytes())?;
         Ok(Self {
-            headers,
-            sources,
+            headers: headermap,
+            sources: sourcemap,
             dir: path.to_path_buf(),
         })
     }
-    pub fn read<P: AsRef<Path>>(dpath: P) -> io::Result<Self> {
+    pub fn write(&mut self) -> io::Result<()> {
+        let build_dir = self.dir.join("build/");
+
+        let mut ser = String::new();
+
+        for (key, entry) in &self.headers {
+            let pt = key.to_string_lossy();
+            ser.push_str(&format!(
+                "<{pt}\x1f{}\x1f{}\n",
+                entry.content, entry.modified
+            ));
+            for dep in &entry.dependents {
+                let dt = dep.to_string_lossy();
+                ser.push_str(&format!("+{dt}\n"));
+            }
+        }
+        for (key, entry) in &self.sources {
+            let pt = key.to_string_lossy();
+            ser.push_str(&format!(
+                ">{pt}\x1f{}\x1f{}\n",
+                entry.content, entry.modified
+            ));
+        }
+
+        fs::write(build_dir.join("cedar.d"), ser.as_bytes())?;
+        Ok(())
+    }
+    pub fn read(&mut self) -> io::Result<()> {
+        let dpath = self.dir.join("build/cedar.d");
+        println!("READ: {dpath:?}");
         let bytes = fs::read(dpath)?;
+
+        println!("READ");
 
         let mut xptr = bytes.as_ptr();
         let mut yptr = xptr;
         let mut xrdr: u8;
         let mut yrdr;
         let end = unsafe { xptr.add(bytes.len()) };
-
-        //let mut headers = Vec::new();
-        //let mut source = Vec::new();
-
+        let mut last_header = Rc::<Path>::from(PathBuf::from("").as_ref());
         while let Some((newline, _)) = findbyte(xptr, b'\n', end) {
             unsafe {
                 xptr = newline;
                 yrdr = *yptr;
                 match yrdr {
                     b'<' => {
-                        // Right now, xptr is at the end of the line, and yptr
-                        // is at the start of the line.
-                        println!("HEADER:");
-
                         let path = if let Some((pend, plen)) = findbyte(yptr, b'\x1f', end) {
                             let path = str::from_utf8_unchecked(std::slice::from_raw_parts(
                                 yptr.add(1),
@@ -195,23 +223,35 @@ impl DependencyGraph {
                             yptr = pend.add(1);
                             Rc::<Path>::from(PathBuf::from(path).as_ref())
                         } else {
-                            todo!()
+                            unreachable!()
                         };
                         let hash = if let Some((hend, hlen)) = findbyte(yptr, b'\x1f', end) {
-                            let hsh =
+                            let hash =
                                 str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, hlen));
                             yptr = hend.add(1);
-                            hsh.parse::<u64>().unwrap()
+                            hash.parse::<u64>().unwrap()
                         } else {
-                            todo!()
+                            unreachable!()
                         };
                         let modify = if let Some((mend, mlen)) = findbyte(yptr, b'\n', end) {
-                            let mdfy =
+                            let modify =
                                 str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, mlen));
-                            mdfy.parse::<u64>().unwrap()
+                            modify.parse::<u64>().unwrap()
                         } else {
-                            todo!()
+                            unreachable!()
                         };
+
+                        last_header = path.clone();
+
+                        self.headers.insert(
+                            path.clone(),
+                            CHeader {
+                                path,
+                                content: hash,
+                                modified: modify,
+                                dependents: Vec::new(),
+                            },
+                        );
                     }
                     b'+' => {
                         let slice = std::slice::from_raw_parts(
@@ -219,29 +259,44 @@ impl DependencyGraph {
                             xptr as usize - yptr as usize - 1,
                         );
                         let str = str::from_utf8_unchecked(slice);
-                        println!("DEPENDANT: {str}");
+                        if let Some(h) = self.headers.get_mut(&last_header) {
+                            h.dependents.push(Rc::<Path>::from(PathBuf::from(str)));
+                        }
                     }
                     b'>' => {
-                        println!("SOURCE:");
-                        if let Some((pend, plen)) = findbyte(yptr, b'\x1f', end) {
+                        let path = if let Some((pend, plen)) = findbyte(yptr, b'\x1f', end) {
                             let path = str::from_utf8_unchecked(std::slice::from_raw_parts(
                                 yptr.add(1),
                                 plen - 1,
                             ));
                             yptr = pend.add(1);
-                            println!("PATH: {path}");
-                        }
-                        if let Some((hend, hlen)) = findbyte(yptr, b'\x1f', end) {
+                            Rc::<Path>::from(PathBuf::from(path).as_ref())
+                        } else {
+                            unreachable!()
+                        };
+                        let hash = if let Some((hend, hlen)) = findbyte(yptr, b'\x1f', end) {
                             let hash =
                                 str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, hlen));
                             yptr = hend.add(1);
-                            println!("HASH: {hash}");
-                        }
-                        if let Some((mend, mlen)) = findbyte(yptr, b'\n', end) {
+                            hash.parse::<u64>().unwrap()
+                        } else {
+                            unreachable!()
+                        };
+                        let modify = if let Some((mend, mlen)) = findbyte(yptr, b'\n', end) {
                             let modify =
                                 str::from_utf8_unchecked(std::slice::from_raw_parts(yptr, mlen));
-                            println!("MOD: {modify}");
-                        }
+                            modify.parse::<u64>().unwrap()
+                        } else {
+                            unreachable!()
+                        };
+                        self.sources.insert(
+                            path.clone(),
+                            CSource {
+                                path,
+                                modified: modify,
+                                content: hash,
+                            },
+                        );
                     }
                     _ => {}
                 }
@@ -250,7 +305,73 @@ impl DependencyGraph {
             }
         }
 
-        todo!()
+        Ok(())
+    }
+    pub fn to_compile(&mut self) -> io::Result<Vec<Rc<Path>>> {
+        println!("to_compile");
+        // Ensure it is synced to the cedar.d file.
+        self.read()?;
+        let mut out = Vec::new();
+        for srcfile in walk_dir(&self.dir)? {
+            println!("{srcfile:?}");
+            let rc = Rc::<Path>::from(srcfile.as_ref());
+            let modify = &rc
+                .metadata()?
+                .modified()?
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            if srcfile.extension().is_some_and(|fs| fs == "c") {
+                self.sources
+                    .entry(rc.clone())
+                    .and_modify(|src| {
+                        if src.modified != *modify {
+                            let bytes = fs::read(&rc).unwrap();
+                            let hash = fxhash(&bytes);
+                            src.modified = *modify;
+                            if src.content != hash {
+                                src.content = hash;
+                                out.push(rc.clone());
+                            }
+                        }
+                    })
+                    .or_insert_with(|| {
+                        out.push(rc.clone());
+                        CSource {
+                            modified: *modify,
+                            path: rc.clone(),
+                            content: fxhash(&fs::read(rc).unwrap()),
+                        }
+                    });
+            } else if srcfile.extension().is_some_and(|ex| ex == "h") {
+                self.headers
+                    .entry(rc.clone())
+                    .and_modify(|head| {
+                        if head.modified != *modify {
+                            let bytes = fs::read(&rc).unwrap();
+                            let hash = fxhash(&bytes);
+                            head.modified = *modify;
+                            if head.content != hash {
+                                head.content = hash;
+                                for dep in &head.dependents {
+                                    out.push(dep.clone());
+                                }
+                            }
+                        }
+                    })
+                    .or_insert_with(|| {
+                        out.push(rc.clone());
+                        CHeader {
+                            modified: *modify,
+                            path: rc.clone(),
+                            content: fxhash(&fs::read(rc).unwrap()),
+                            dependents: Vec::new(),
+                        }
+                    });
+            }
+        }
+        println!("OUT:: {out:?}");
+        Ok(out)
     }
 }
 
@@ -260,7 +381,8 @@ mod core_dag_t {
 
     #[test]
     fn init_t() {
-        let dag = DependencyGraph::new("./tests/data/calc/").unwrap();
-        let de = DependencyGraph::read("./tests/data/calc/build/cedar.d").unwrap();
+        let mut dag = DependencyGraph::new("./tests/data/calc/");
+        dag.read().unwrap();
+        let to_compile = dag.to_compile().unwrap();
     }
 }

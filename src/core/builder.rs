@@ -6,7 +6,12 @@ use std::{
     rc::Rc,
 };
 
-use crate::core::{error::BuilderError, manifest::Manifest, utils::which};
+use crate::core::{
+    dag::DependencyGraph,
+    error::BuilderError,
+    manifest::Manifest,
+    utils::{walk_dir, which},
+};
 
 #[derive(Debug)]
 pub struct Compiler {
@@ -89,6 +94,8 @@ impl Compiler {
             src_str
         );
 
+        println!("{command_str}");
+
         let command = command_str.split_ascii_whitespace().collect::<Vec<_>>();
         let compile = Command::new(command[0]).args(&command[1..]).spawn()?;
 
@@ -115,6 +122,7 @@ impl Compiler {
                 .map(|x| format!("{} ", x.as_ref().to_string_lossy()))
                 .collect::<String>()
         );
+        println!("{command_str}");
 
         let command = command_str.split_ascii_whitespace().collect::<Vec<_>>();
         let link = Command::new(command[0])
@@ -129,10 +137,12 @@ impl Compiler {
 #[derive(Debug)]
 pub struct Builder {
     manifest: Manifest,
+    depends: DependencyGraph,
     compiler: Compiler,
     dir: PathBuf,
     build_dir: PathBuf,
     files: Vec<PathBuf>,
+    objs: Vec<Rc<Path>>,
 }
 
 impl Builder {
@@ -162,31 +172,60 @@ impl Builder {
             Ok(())
         }
 
+        let dpath = path.join("build/cedar.d");
+        let depends = if !dpath.exists() {
+            DependencyGraph::build(path)?
+        } else {
+            let mut new = DependencyGraph::new(path);
+            new.read()?;
+            new
+        };
+
         rec(&mut files, path)?;
 
         Ok(Self {
             manifest,
             compiler,
+            depends,
             dir: path.to_path_buf(),
             build_dir: path.join("build"),
             files,
+            objs: Vec::new(),
         })
     }
-    pub fn build(&self) -> Result<(), BuilderError> {
+    pub fn build(&mut self) -> Result<(), BuilderError> {
         if !self.build_dir.exists() {
             fs::create_dir_all(&self.build_dir)?;
         }
+        println!("1");
 
-        let mut link = Vec::with_capacity(self.files.len());
-        for file in &self.files {
+        for file in &self.depends.to_compile()? {
             let hash = mangle_path(file);
-            let outpath = self.dir.join("build").join(format!("{hash}.o"));
+            println!("3");
+            let outpath =
+                Rc::<Path>::from(self.dir.join("build").join(format!("{hash}.o")).as_ref());
             self.compiler.compile(file, &outpath)?;
-            link.push(outpath);
+            println!("4");
         }
 
+        let link = walk_dir(&self.build_dir)?
+            .iter()
+            .filter_map(|pt| {
+                if pt.extension().is_some_and(|ex| ex == "o") {
+                    Some(Rc::<Path>::from(pt.as_ref()))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        println!("{link:?}");
+
         self.compiler
-            .link(&link, self.build_dir.join(self.manifest.name.as_ref()))
+            .link(
+                &link,
+                Rc::<Path>::from(self.build_dir.join(self.manifest.name.as_ref())),
+            )
             .unwrap();
         Ok(())
     }
@@ -227,8 +266,7 @@ mod core_builder_t {
     }
     #[test]
     fn builder_t() {
-        let calc_builder = Builder::new(CALC_PATH).unwrap();
+        let mut calc_builder = Builder::new(CALC_PATH).unwrap();
         calc_builder.build().unwrap();
-        println!("{calc_builder:?}");
     }
 }

@@ -19,10 +19,12 @@ int main(void) {
     trim_newline(input);
 
     if (strcmp(input, "quit") == 0) {
+
       break;
     } else if (strncmp(input, "let ", 4) == 0) {
       char var[32];
       double val;
+
       if (sscanf(input + 4, "%31s = %lf", var, &val) == 2) {
         set_variable(var, val);
         printf("Set %s = %g\n", var, val);

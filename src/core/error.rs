@@ -1,5 +1,7 @@
 use std::{error::Error, fmt::Display, io};
 
+use crate::core::utils::findbyte;
+
 #[derive(Debug)]
 pub enum WalkerError {
     InvalidRoot,
@@ -20,6 +22,7 @@ pub enum ManifestError {
     MissingName,
     MissingCompiler,
     Invalid,
+    ParseError(*const u8, *const u8, *const u8),
 }
 
 impl Display for ManifestError {
@@ -33,6 +36,33 @@ impl Display for ManifestError {
                 writeln!(f, "Failed to parse manifest, no C compiler is specified.")
             }
             Self::Invalid => writeln!(f, "Failed to parse manifest for unknown reasons."),
+            Self::ParseError(start, ptr, end) => {
+                let mut str = unsafe {
+                    str::from_utf8_unchecked(std::slice::from_raw_parts(
+                        *start,
+                        *ptr as usize - *start as usize,
+                    ))
+                }
+                .lines()
+                .collect::<Vec<_>>();
+                let last = unsafe {
+                    str::from_utf8_unchecked(std::slice::from_raw_parts(
+                        *ptr,
+                        findbyte(*ptr, b'\n', *end).unwrap_or(*end) as usize - *ptr as usize,
+                    ))
+                };
+                str.push("");
+                let indent = str.last().unwrap().len();
+                writeln!(
+                    f,
+                    "\n{}{}{}^\n{}|\n{}Error here",
+                    str.join("\n"),
+                    last,
+                    " ".repeat(indent),
+                    " ".repeat(indent),
+                    " ".repeat(indent)
+                )
+            }
         }
     }
 }

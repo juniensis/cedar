@@ -1,5 +1,0 @@
-<./tests/data/calc/src/util.h17398504828274940751756001346
-<./tests/data/calc/src/inner/eval.h12891248787477407281755823576
->./tests/data/calc/src/main.c120699662336128881451756001339
->./tests/data/calc/src/inner/eval.c58215833448721938541755911020
->./tests/data/calc/src/util.c151718729949998339921755910988

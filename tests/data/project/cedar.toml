@@ -1,9 +1,0 @@
-[meta]
-name = "test"
-version = "0.2.0"
-
-[build]
-compiler = "clang"
-
-[dependencies]
-math = "deps/math.h"

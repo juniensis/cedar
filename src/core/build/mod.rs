@@ -1,19 +1,76 @@
 use std::{
     collections::HashSet,
     fmt::Display,
+    fs,
     path::{Path, PathBuf},
     rc::Rc,
     time::UNIX_EPOCH,
 };
 
 use crate::core::{
+    build::{compiler::Compiler, graph::BuildGraph},
     error::BuilderError,
     hash::{K, fx_content_hash_words, fx_hash},
+    manifest::Manifest,
 };
 
 pub mod compiler;
 pub mod graph;
 pub mod lock;
+
+#[derive(Debug)]
+pub struct Builder {
+    root: PathBuf,
+    build_dir: PathBuf,
+    bin_dir: PathBuf,
+    graph: BuildGraph,
+    compiler: Compiler,
+    manifest: Manifest,
+}
+
+impl Builder {
+    pub fn new<P: AsRef<Path>>(root: P) -> Result<Self, BuilderError> {
+        let root = root.as_ref();
+        let manifest_path = root.join("cedar.toml");
+        if !manifest_path.exists() {
+            return Err(BuilderError::NoManifest(format!(
+                "{}",
+                root.to_string_lossy()
+            )));
+        }
+
+        let manifest = Manifest::parse(&fs::read(manifest_path)?)?;
+        let compiler = manifest.compiler()?;
+        let graph = BuildGraph::new(root)?;
+
+        Ok(Self {
+            root: root.to_path_buf(),
+            build_dir: root.join("build"),
+            bin_dir: root.join(format!("build/{}", manifest.name)),
+            graph,
+            compiler,
+            manifest,
+        })
+    }
+    pub fn build(&mut self) -> Result<(), BuilderError> {
+        for cmp in self.graph.to_compile() {
+            let dst = self.root.join("build").join(mangle_path(&cmp));
+            println!("{dst:?}");
+            self.compiler.compile(cmp, dst.into())?;
+        }
+
+        let link = self
+            .graph
+            .to_link()
+            .iter()
+            .map(|x| self.build_dir.join(x))
+            .collect::<Vec<_>>();
+
+        self.compiler.link(&link, &self.bin_dir)?;
+
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct CSource {
@@ -161,5 +218,16 @@ impl Display for CHeader {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod core_build_t {
+    use crate::core::build::Builder;
+
+    #[test]
+    fn builder_t() {
+        let mut builder = Builder::new("./tests/proj/cred_jwerle_b64").unwrap();
+        builder.build().unwrap();
     }
 }

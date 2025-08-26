@@ -1,11 +1,13 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    process::Command,
     rc::Rc,
 };
 
 use crate::core::{
-    error::ManifestError,
+    build::compiler::Compiler,
+    error::{BuilderError, ManifestError},
     manifest::toml::{Value, toml_parse},
 };
 
@@ -36,7 +38,10 @@ pub struct Manifest {
 
 impl Manifest {
     pub fn parse_str(src: &str) -> Result<Self, ManifestError> {
-        let tables = toml_parse(src.as_bytes());
+        Self::parse(src.as_bytes())
+    }
+    pub fn parse(src: &[u8]) -> Result<Self, ManifestError> {
+        let tables = toml_parse(src);
         let mut name: Rc<str> = Default::default();
         let mut version: Option<Rc<str>> = Default::default();
         let mut compiler: Rc<str> = Default::default();
@@ -96,13 +101,16 @@ impl Manifest {
         }
 
         Ok(Self {
-            raw: src.into(),
+            raw: Rc::from(str::from_utf8(src).unwrap()),
             name,
             version,
             compiler,
             cflags,
             deps,
         })
+    }
+    pub fn compiler(&self) -> Result<Compiler, BuilderError> {
+        Compiler::new(self.compiler.clone(), &self.cflags)
     }
 }
 

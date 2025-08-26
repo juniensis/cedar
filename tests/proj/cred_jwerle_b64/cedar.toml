@@ -1,0 +1,7 @@
+[meta]
+name = "b64"
+version = "0.1.0"
+
+[build]
+compiler = "clang"
+cflags = ["-Wall", "-Wextra"]

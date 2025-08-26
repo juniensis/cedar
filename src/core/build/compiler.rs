@@ -116,7 +116,7 @@ impl Compiler {
         }
     }
     /// Links the given .o files into a binary specified by 'dst'.
-    pub fn link<P: AsRef<Path>>(&self, objects: &[P], dst: P) -> Result<String, BuilderError> {
+    pub fn link<P: AsRef<Path>>(&self, objects: &[P], dst: &P) -> Result<String, BuilderError> {
         let dst = dst.as_ref();
         if let Some(par) = dst.parent() {
             if !par.exists() {

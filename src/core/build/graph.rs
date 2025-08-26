@@ -12,10 +12,12 @@ use crate::core::{
     utils::modified,
 };
 
+#[derive(Debug)]
 pub struct BuildGraph {
     dir: PathBuf,
     lock: LockFile,
     compile: HashSet<Rc<Path>>,
+    objs: HashSet<Rc<Path>>,
 }
 
 impl BuildGraph {
@@ -31,8 +33,11 @@ impl BuildGraph {
         cfile_recurse(&mut headers, &mut sources, root.as_ref())?;
 
         let mut compile = HashSet::new();
+        let mut objs = HashSet::new();
 
         for source in sources {
+            let obj = Rc::<Path>::from(source.obj.as_ref());
+            objs.insert(obj);
             if let Some(cmp) = lock.insert_source(source) {
                 compile.insert(cmp);
             }
@@ -46,14 +51,20 @@ impl BuildGraph {
             }
         }
 
-        println!("{compile:?}");
         lock.write()?;
 
         Ok(Self {
             dir: root.as_ref().to_path_buf(),
             lock,
             compile,
+            objs,
         })
+    }
+    pub fn to_compile(&self) -> Vec<Rc<Path>> {
+        self.compile.iter().cloned().collect()
+    }
+    pub fn to_link(&self) -> Vec<Rc<Path>> {
+        self.objs.iter().cloned().collect()
     }
 }
 

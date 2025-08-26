@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display, io};
+use std::{error::Error, fmt::Display, io, path::PathBuf};
 
 use crate::core::utils::findbyte;
 
@@ -77,6 +77,7 @@ pub enum BuilderError {
     IoError(io::Error),
     NoManifest(String),
     ManifestError(ManifestError),
+    LockError(LockError),
 }
 
 impl Display for BuilderError {
@@ -94,6 +95,7 @@ impl Display for BuilderError {
             Self::IoError(e) => writeln!(f, "{e}"),
             Self::NoManifest(s) => writeln!(f, "BuilderError: No Cedar manifest in the path {s}."),
             Self::ManifestError(e) => write!(f, "BuilderError: {e}"),
+            Self::LockError(e) => write!(f, "BuilderError: {e}"),
         }
     }
 }
@@ -109,5 +111,39 @@ impl From<io::Error> for BuilderError {
 impl From<ManifestError> for BuilderError {
     fn from(err: ManifestError) -> Self {
         Self::ManifestError(err)
+    }
+}
+
+impl From<LockError> for BuilderError {
+    fn from(err: LockError) -> Self {
+        Self::LockError(err)
+    }
+}
+
+#[derive(Debug)]
+pub enum LockError {
+    InvalidLockFile,
+    NotACFile(PathBuf),
+    IoError(io::Error),
+}
+
+impl Display for LockError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidLockFile => writeln!(f, "LockError: Invalid lock file."),
+            Self::NotACFile(p) => writeln!(
+                f,
+                "LockError: Attempted to insert a a file without the '.c' or '.h' extension: {p:?}"
+            ),
+            Self::IoError(e) => writeln!(f, "{e:?}"),
+        }
+    }
+}
+
+impl Error for LockError {}
+
+impl From<io::Error> for LockError {
+    fn from(err: io::Error) -> Self {
+        Self::IoError(err)
     }
 }

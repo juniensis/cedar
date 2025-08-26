@@ -153,13 +153,3 @@ impl Compiler {
         }
     }
 }
-
-#[derive(Debug)]
-pub struct Builder {
-    manifest: Manifest,
-    compiler: Compiler,
-    root_dir: PathBuf,
-    build_dir: PathBuf,
-    files: Vec<PathBuf>,
-    objs: Vec<Rc<Path>>,
-}

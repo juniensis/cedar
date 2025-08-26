@@ -1,85 +1,106 @@
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     fs, io,
     path::{Path, PathBuf},
     rc::Rc,
-    time::UNIX_EPOCH,
 };
 
-use crate::core::hash::fx_content_hash_words;
-
-pub enum MetaData {
-    Source {
-        modified: u64,
-        hash: u64,
-    },
-    Header {
-        modified: u64,
-        hash: u64,
-        dependents: Vec<Rc<Path>>,
-    },
-}
+use crate::core::{
+    build::{CFile, CHeader, CSource, lock::LockFile, mangle_path},
+    error::BuilderError,
+    hash::fx_content_hash_words,
+    utils::modified,
+};
 
 pub struct BuildGraph {
-    src_dir: PathBuf,
-    build_dir: PathBuf,
-    lock_dir: PathBuf,
-    nodes: HashMap<PathBuf, MetaData>,
+    dir: PathBuf,
+    lock: LockFile,
+    compile: HashSet<Rc<Path>>,
 }
 
 impl BuildGraph {
-    pub fn new<P: AsRef<Path>>(root: P) -> Self {
-        let src_dir = root.as_ref().join("src");
+    pub fn new<P: AsRef<Path>>(root: P) -> Result<Self, BuilderError> {
         let build_dir = root.as_ref().join("build");
-        let lock_dir = build_dir.join("cedar.lock");
-        let mut nodes = HashMap::new();
+        if !build_dir.exists() {
+            fs::create_dir_all(&build_dir)?;
+        }
 
-        fn rec<P: AsRef<Path>>(out: &mut HashMap<PathBuf, MetaData>, cur: P) -> io::Result<()> {
-            let path = cur.as_ref();
-            for entry in path.read_dir()?.flatten() {
-                let tp = entry.file_type()?;
-                let pt = entry.path();
-                if tp.is_dir() {
-                    rec(out, pt)?;
-                } else if tp.is_file() {
-                    if pt.extension().is_some_and(|ex| ex == ".c") {
-                        let hash = fx_content_hash_words(&pt);
-                        let modified = entry
-                            .metadata()?
-                            .modified()?
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs();
-                        out.insert(pt, MetaData::Source { modified, hash });
-                    } else if pt.extension().is_some_and(|ex| ex == ".h") {
-                        let hash = fx_content_hash_words(&pt);
-                        let modified = entry
-                            .metadata()?
-                            .modified()?
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs();
-                        out.insert(
-                            pt,
-                            MetaData::Header {
-                                modified,
-                                hash,
-                                dependents: Vec::new(),
-                            },
-                        );
-                    }
+        let mut lock = LockFile::new(&build_dir)?;
+        let mut sources = Vec::new();
+        let mut headers = Vec::new();
+        cfile_recurse(&mut headers, &mut sources, root.as_ref())?;
+
+        let mut compile = HashSet::new();
+
+        for source in sources {
+            if let Some(cmp) = lock.insert_source(source) {
+                compile.insert(cmp);
+            }
+        }
+
+        for header in headers {
+            if let Some(deps) = lock.insert_header(header) {
+                for dep in deps {
+                    compile.insert(dep);
                 }
             }
-            Ok(())
         }
 
-        rec(&mut nodes, root).unwrap();
+        println!("{compile:?}");
+        lock.write()?;
 
-        Self {
-            src_dir,
-            build_dir,
-            lock_dir,
-            nodes,
+        Ok(Self {
+            dir: root.as_ref().to_path_buf(),
+            lock,
+            compile,
+        })
+    }
+}
+
+fn cfile_recurse<P: AsRef<Path>>(
+    hdr: &mut Vec<CHeader>,
+    src: &mut Vec<CSource>,
+    path: P,
+) -> io::Result<()> {
+    let path = path.as_ref();
+    for entry in path.read_dir()?.flatten() {
+        let ft = entry.file_type()?;
+        let pt = entry.path();
+        if ft.is_dir() {
+            cfile_recurse(hdr, src, pt)?;
+        } else if ft.is_file() {
+            if pt.extension().is_some_and(|ex| ex == "c") {
+                let obj = mangle_path(&pt);
+                let hash = fx_content_hash_words(&pt);
+                let modified = modified(&pt).unwrap();
+                src.push(CSource {
+                    path: pt,
+                    obj,
+                    hash,
+                    modified,
+                })
+            } else if pt.extension().is_some_and(|ex| ex == "h") {
+                let hash = fx_content_hash_words(&pt);
+                let modified = modified(&pt).unwrap();
+                hdr.push(CHeader {
+                    hash,
+                    modified,
+                    path: pt,
+                    dependents: HashSet::new(),
+                })
+            }
         }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod core_build_graph_t {
+    use crate::core::build::graph::BuildGraph;
+
+    #[test]
+    fn core_build_graph_init_t() {
+        let small_example = "./tests/proj/cred_jwerle_b64";
+        let graph = BuildGraph::new(small_example).unwrap();
     }
 }

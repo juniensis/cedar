@@ -3,6 +3,7 @@ use std::{
     io,
     path::{Path, PathBuf},
     process::Command,
+    time::UNIX_EPOCH,
 };
 
 unsafe extern "C" {
@@ -45,4 +46,18 @@ pub fn walk_dir<P: AsRef<Path>>(root: P) -> io::Result<Vec<PathBuf>> {
     let mut ret = Vec::new();
     rec(&mut ret, root)?;
     Ok(ret)
+}
+
+#[inline]
+pub fn modified<P: AsRef<Path>>(path: P) -> Option<u64> {
+    Some(
+        path.as_ref()
+            .metadata()
+            .ok()?
+            .modified()
+            .ok()?
+            .duration_since(UNIX_EPOCH)
+            .ok()?
+            .as_secs(),
+    )
 }

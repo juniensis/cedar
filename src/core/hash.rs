@@ -1,6 +1,6 @@
 use std::{fs, ops::BitXor, path::Path};
 
-const K: usize = 0x517cc1b727220a95;
+pub const K: usize = 0x517cc1b727220a95;
 
 #[inline]
 pub fn fx_hash(x: &[u8]) -> u64 {

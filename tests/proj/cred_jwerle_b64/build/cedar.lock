@@ -1,0 +1,25 @@
+[./tests/proj/cred_jwerle_b64/b64.h]
+hash = 15434412160305978058
+modified = 1756179868
+dependents = []
+
+[./tests/proj/cred_jwerle_b64/main.c]
+obj = "9b020552e42711d6.o"
+hash = 16941469994091201850
+modified = 1756180575
+
+[./tests/proj/cred_jwerle_b64/encode.c]
+obj = "52bf503979d411aa.o"
+hash = 3677154192605133303
+modified = 1756179868
+
+[./tests/proj/cred_jwerle_b64/decode.c]
+obj = "159298eef5b93a5e.o"
+hash = 17462154381773214503
+modified = 1756179868
+
+[./tests/proj/cred_jwerle_b64/buffer.c]
+obj = "d3331ac1a0886ce2.o"
+hash = 2875968749085586356
+modified = 1756179868
+

@@ -23,6 +23,9 @@ impl Value {
     /// passed in, a String containing the data will be returned.
     pub fn parse(source: &str) -> Self {
         if source.starts_with('[') && source.ends_with(']') {
+            if source.len() < 3 {
+                return Value::List(Vec::new());
+            }
             let trimmed = source
                 .trim_start_matches("[\"")
                 .trim_end_matches("\"]")
@@ -132,7 +135,6 @@ impl Table {
                 //     ^- xptr
                 xptr = tfindbyte(yptr, b'=', end)?.add(1);
                 yptr = tfindbyte(yptr, b'\n', end)?;
-
                 // Trim whitespace again.
                 let val_len = loop {
                     xrdr = *xptr;
@@ -198,7 +200,6 @@ pub fn toml_parse(bytes: &[u8]) -> Vec<Table> {
         }
     }
     section_pointers.push(end);
-
     for window in section_pointers.windows(2) {
         if window.len() == 2 {
             match Table::parse(window[0], window[1]) {

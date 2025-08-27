@@ -46,7 +46,7 @@ impl Builder {
         Ok(Self {
             root: root.to_path_buf(),
             build_dir: root.join("build"),
-            bin_dir: root.join(format!("build/{}", manifest.name)),
+            bin_dir: root.join(format!("{}", manifest.name)),
             graph,
             compiler,
             manifest,
@@ -54,10 +54,12 @@ impl Builder {
     }
     pub fn build(&mut self) -> Result<(), BuilderError> {
         for cmp in self.graph.to_compile() {
-            let dst = self.root.join("build").join(mangle_path(&cmp));
+            let dst = self.root.join("build").join(mangle(&cmp));
             println!("{dst:?}");
             self.compiler.compile(cmp, dst.into())?;
         }
+
+        self.graph.clean()?;
 
         let link = self
             .graph
@@ -100,7 +102,7 @@ impl Eq for CSource {}
 #[inline]
 pub fn mangle<P: AsRef<Path>>(path: P) -> String {
     format!(
-        "{:016x}.o",
+        "{:016x}",
         fx_hash(path.as_ref().as_os_str().as_encoded_bytes())
     )
 }
@@ -152,7 +154,7 @@ impl CSource {
 }
 
 impl CHeader {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, BuilderError> {
+    pub fn from_path<P: AsRef<Path>>(path: P, build: P) -> Result<Self, BuilderError> {
         let path = path.as_ref();
         let hash = fx_content_hash_words(path);
         let modified = path
@@ -168,6 +170,10 @@ impl CHeader {
             modified,
             dependents: HashSet::new(),
         })
+    }
+    pub fn add_dependents<P: AsRef<Path>>(&mut self, build: P) -> Result<(), BuilderError> {
+        dep_recurse(self, build)?;
+        Ok(())
     }
     pub fn update(&mut self) -> Result<(), BuilderError> {
         self.hash = fx_content_hash_words(&(self.path));
@@ -221,13 +227,39 @@ impl Display for CHeader {
     }
 }
 
+fn dep_recurse<P: AsRef<Path>>(out: &mut CHeader, path: P) -> std::io::Result<()> {
+    let path = path.as_ref();
+    for entry in path.read_dir()?.flatten() {
+        let pt = entry.path();
+        let ft = entry.file_type()?;
+        if ft.is_dir() {
+            dep_recurse(out, path)?;
+        } else if ft.is_file() && pt.extension().is_some_and(|ex| ex == "d") {
+            let dfile = fs::read_to_string(&pt)?;
+            if let Some(split) = dfile.split(':').next_back() {
+                let mut iter = split.split_ascii_whitespace().filter(|x| x.trim() != "\\");
+                if let Some(src) = iter.next()
+                    && src.ends_with(".c")
+                {
+                    for header in iter.map(|x| PathBuf::from(format!("./{}", x))) {
+                        if header == out.path {
+                            out.dependents.insert(Rc::<Path>::from(PathBuf::from(src)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod core_build_t {
     use crate::core::build::Builder;
 
     #[test]
     fn builder_t() {
-        let mut builder = Builder::new("./tests/proj/cred_jwerle_b64").unwrap();
+        let mut builder = Builder::new("./tests/proj/cred_attractivechaos_klib").unwrap();
         builder.build().unwrap();
     }
 }

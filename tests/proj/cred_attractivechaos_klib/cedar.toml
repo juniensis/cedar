@@ -1,0 +1,7 @@
+[meta]
+name = "klib"
+version = "0.1.0"
+
+[build]
+compiler = "clang"
+cflags = ["-Wall", "-Wextra"]

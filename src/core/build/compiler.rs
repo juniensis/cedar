@@ -69,7 +69,7 @@ impl Compiler {
     /// Compile a file. Runs the following command (if clang is used with
     /// -Wall and -Wextra):
     ///
-    /// 'clang -MMD -MF dst.d -c -O2 -Iinclude -Wall -Wextra -o dst src'
+    /// 'clang -MMD -MF dst.d -c -O2 -Iinclude -Wall -Wextra -o dst.o src'
     pub fn compile<P: AsRef<Path>>(&self, src: P, dst: P) -> Result<String, BuilderError> {
         let src = src.as_ref();
         let name = src
@@ -93,7 +93,7 @@ impl Compiler {
         let dst_str = dst.as_ref().to_string_lossy();
 
         let command_str = format!(
-            "{} -MMD -MF {}.d -c -O2 -Iinclude {} -o {} {}",
+            "{} -MMD -MF {}.d -c -O2 -Iinclude {} -o {}.o {}",
             self.cmd,
             dst_str,
             self.flags.join(" "),
@@ -134,7 +134,7 @@ impl Compiler {
             dst.to_string_lossy(),
             objects
                 .iter()
-                .map(|x| format!("{} ", x.as_ref().to_string_lossy()))
+                .map(|x| format!("{}.o ", x.as_ref().to_string_lossy()))
                 .collect::<String>()
         );
 

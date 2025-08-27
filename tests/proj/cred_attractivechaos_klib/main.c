@@ -1,4 +1,5 @@
 #include "khash.h"
+#include <stdio.h>
 
 KHASH_MAP_INIT_INT(m32, char) // instantiate structs and methods
 int main() {
@@ -11,6 +12,7 @@ int main() {
   kh_value(h, k) = 10;           // set the value
   k = kh_get(m32, h, 10);        // query the hash table
   is_missing = (k == kh_end(h)); // test if the key is present
+  printf("tes");
   k = kh_get(m32, h, 5);
   kh_del(m32, h, k);                         // remove a key-value pair
   for (k = kh_begin(h); k != kh_end(h); ++k) // traverse

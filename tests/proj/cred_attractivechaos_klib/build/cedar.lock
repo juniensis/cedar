@@ -1,0 +1,210 @@
+[./tests/proj/cred_attractivechaos_klib/kavl-lite.h]
+hash = 6995908543583774801
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kbtree.h]
+hash = 9865301260239021896
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kavl.h]
+hash = 10759539459507314131
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kdq.h]
+hash = 13722457863916015836
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/krng.h]
+hash = 11532827728208894706
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kbit.h]
+hash = 17891058895652300281
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/knetfile.h]
+hash = 2521024055711184000
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/knetfile.c"]
+
+[./tests/proj/cred_attractivechaos_klib/khash.h]
+hash = 11248209085669527570
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/main.c"]
+
+[./tests/proj/cred_attractivechaos_klib/kseq.h]
+hash = 3250636054238793325
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kmath.h]
+hash = 8425083767545993726
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/kmath.c"]
+
+[./tests/proj/cred_attractivechaos_klib/ksort.h]
+hash = 18354858196500424624
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kvec.h]
+hash = 119930755518213046
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/knhx.h]
+hash = 14031543630892204011
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/knhx.c"]
+
+[./tests/proj/cred_attractivechaos_klib/ksw.h]
+hash = 7199356730058820185
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/ksw.c"]
+
+[./tests/proj/cred_attractivechaos_klib/khmm.h]
+hash = 9054672633744666087
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/khmm.c"]
+
+[./tests/proj/cred_attractivechaos_klib/kthread.h]
+hash = 6938346810071621208
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kstring.h]
+hash = 3434478581977509169
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/kstring.c"]
+
+[./tests/proj/cred_attractivechaos_klib/khashl.h]
+hash = 8131564621878791467
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kmempool.h]
+hash = 9775143204520835094
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/kmempool.c"]
+
+[./tests/proj/cred_attractivechaos_klib/kexpr.h]
+hash = 2087172612353298996
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/kexpr.c"]
+
+[./tests/proj/cred_attractivechaos_klib/klist.h]
+hash = 16760220642551763683
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/kgraph.h]
+hash = 6613323782537905971
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/ketopt.h]
+hash = 6580556662003617542
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/keigen.h]
+hash = 6964578162125081156
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/keigen.c"]
+
+[./tests/proj/cred_attractivechaos_klib/kson.h]
+hash = 17465462155361927474
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/kson.c"]
+
+[./tests/proj/cred_attractivechaos_klib/kalloc.h]
+hash = 17976913857551145657
+modified = 1756179845
+dependents = ["tests/proj/cred_attractivechaos_klib/kalloc.c"]
+
+[./tests/proj/cred_attractivechaos_klib/krmq.h]
+hash = 15114334916074601138
+modified = 1756179845
+dependents = []
+
+[./tests/proj/cred_attractivechaos_klib/knetfile.c]
+obj = "88e1d8529577d52d"
+hash = 18365074076412970728
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kopen.c]
+obj = "adc06646fe5ce268"
+hash = 9311809402994248710
+modified = 1756253395
+
+[./tests/proj/cred_attractivechaos_klib/ksa.c]
+obj = "b4118f46e852a984"
+hash = 666805765035694102
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kalloc.c]
+obj = "7175e5dd8244623d"
+hash = 8279831160253729559
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/main.c]
+obj = "051055680d1b99a8"
+hash = 6613328047729381611
+modified = 1756253645
+
+[./tests/proj/cred_attractivechaos_klib/khmm.c]
+obj = "09ff39a21bb13a9f"
+hash = 9064281509388097131
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kexpr.c]
+obj = "7db0fadf9f7da938"
+hash = 7740234350883455573
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kstring.c]
+obj = "830cc9d772d50fa3"
+hash = 14818103202937140392
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kmempool.c]
+obj = "494c6483fd1225c7"
+hash = 675516829036685288
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kthread.c]
+obj = "156fde0df8370ce4"
+hash = 16655857450820040259
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/ksw.c]
+obj = "f303b2d96bf44a78"
+hash = 9483821888659866423
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kmath.c]
+obj = "f96735ddbb481d38"
+hash = 13967473258686936664
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/keigen.c]
+obj = "84943e33f517c3c2"
+hash = 2957629807707110652
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/kson.c]
+obj = "2610cc9cdb95de3e"
+hash = 5042173614886401136
+modified = 1756179845
+
+[./tests/proj/cred_attractivechaos_klib/knhx.c]
+obj = "a483da38128269d9"
+hash = 12903008516722656409
+modified = 1756179845
+

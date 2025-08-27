@@ -60,6 +60,21 @@ impl BuildGraph {
             objs,
         })
     }
+    pub fn clean(&self) -> Result<(), BuilderError> {
+        for entry in self.dir.join("build/").read_dir()?.flatten() {
+            let (pt, ft) = (entry.path(), entry.file_type()?);
+            if pt.extension().is_some_and(|ex| ex == "o")
+                && !self.objs.contains(&Rc::<Path>::from(
+                    pt.with_extension("").file_name().unwrap().as_ref(),
+                ))
+            {
+                fs::remove_file(&pt)?;
+                fs::remove_file(pt.with_extension("d"))?;
+            }
+        }
+
+        Ok(())
+    }
     pub fn to_compile(&self) -> Vec<Rc<Path>> {
         self.compile.iter().cloned().collect()
     }

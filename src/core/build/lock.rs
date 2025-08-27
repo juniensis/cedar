@@ -62,8 +62,9 @@ impl LockFile {
     /// Insert a header and return if the headers dependents need to be
     /// compiled.
     #[inline]
-    pub fn insert_header(&mut self, hdr: CHeader) -> Option<Vec<Rc<Path>>> {
+    pub fn insert_header(&mut self, mut hdr: CHeader) -> Option<Vec<Rc<Path>>> {
         let rc = Rc::<Path>::from(hdr.path.as_ref());
+        hdr.add_dependents(self.path.parent()?).ok()?;
         let file = hdr.as_cfile();
         if self.contains(&file) {
             if !self.hash_matches(&file) {
@@ -330,7 +331,7 @@ mod core_build_lock_t {
         fs::write(&hdr_path, b"int add(int a, int b);").unwrap();
 
         let mut src = CSource::from_path(&src_path).unwrap();
-        let mut hdr = CHeader::from_path(&hdr_path).unwrap();
+        let mut hdr = CHeader::from_path(&hdr_path, &root.join("build")).unwrap();
 
         let mut lock = LockFile::new(root).unwrap();
         assert!(!lock.contains(&src.as_cfile()));

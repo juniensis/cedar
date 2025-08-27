@@ -40,8 +40,20 @@ impl Builder {
         }
 
         let manifest = Manifest::parse(&fs::read(manifest_path)?)?;
+        let bin_dir = root.join(format!("{}", manifest.name));
         let compiler = manifest.compiler()?;
-        let graph = BuildGraph::new(root)?;
+        let graph = BuildGraph::new(root, &bin_dir)?;
+
+        println!(
+            "\n  \x1b[1;32mBuilding\x1b[0m {} {}({:?})",
+            manifest.name,
+            manifest
+                .version
+                .clone()
+                .map(|x| format!("v{x} "))
+                .unwrap_or_default(),
+            root,
+        );
 
         Ok(Self {
             root: root.to_path_buf(),
@@ -52,9 +64,17 @@ impl Builder {
             manifest,
         })
     }
+    pub fn bin_dir(&self) -> PathBuf {
+        self.bin_dir.clone()
+    }
     pub fn build(&mut self) -> Result<(), BuilderError> {
+        if !self.graph.to_compile().is_empty() {
+            println!("\n    \x1b[1;32mCompiling\x1b[0m",);
+        }
+
         let mut children = Vec::new();
         for cmp in self.graph.to_compile() {
+            println!("      -> {}", cmp.to_string_lossy());
             let dst = self.root.join("build").join(mangle(&cmp));
             children.push(self.compiler.compile(cmp, dst.into())?);
         }
@@ -69,14 +89,21 @@ impl Builder {
 
         self.graph.clean()?;
 
-        let link = self
-            .graph
-            .to_link()
-            .iter()
-            .map(|x| self.build_dir.join(x))
-            .collect::<Vec<_>>();
+        if !self.graph.to_link().is_empty() {
+            println!("\n    \x1b[1;32mLinking\x1b[0m");
+            let link = self
+                .graph
+                .to_link()
+                .iter()
+                .map(|x| {
+                    let dir = self.build_dir.join(x);
+                    println!("      -> {}.o", dir.as_os_str().to_string_lossy());
+                    dir
+                })
+                .collect::<Vec<_>>();
 
-        self.compiler.link(&link, &self.bin_dir)?;
+            self.compiler.link(&link, &self.bin_dir)?;
+        }
 
         Ok(())
     }

@@ -15,13 +15,14 @@ use crate::core::{
 #[derive(Debug)]
 pub struct BuildGraph {
     dir: PathBuf,
+    bin: PathBuf,
     lock: LockFile,
     compile: HashSet<Rc<Path>>,
     objs: HashSet<Rc<Path>>,
 }
 
 impl BuildGraph {
-    pub fn new<P: AsRef<Path>>(root: P) -> Result<Self, BuilderError> {
+    pub fn new<P: AsRef<Path>>(root: P, bin: P) -> Result<Self, BuilderError> {
         let build_dir = root.as_ref().join("build");
         if !build_dir.exists() {
             fs::create_dir_all(&build_dir)?;
@@ -55,6 +56,7 @@ impl BuildGraph {
 
         Ok(Self {
             dir: root.as_ref().to_path_buf(),
+            bin: bin.as_ref().to_path_buf(),
             lock,
             compile,
             objs,
@@ -79,7 +81,11 @@ impl BuildGraph {
         self.compile.iter().cloned().collect()
     }
     pub fn to_link(&self) -> Vec<Rc<Path>> {
-        self.objs.iter().cloned().collect()
+        if self.compile.is_empty() {
+            Vec::new()
+        } else {
+            self.objs.iter().cloned().collect()
+        }
     }
 }
 
@@ -127,6 +133,6 @@ mod core_build_graph_t {
     #[test]
     fn core_build_graph_init_t() {
         let small_example = "./tests/proj/cred_jwerle_b64";
-        let graph = BuildGraph::new(small_example).unwrap();
+        let graph = BuildGraph::new(small_example, "b64").unwrap();
     }
 }

@@ -35,6 +35,9 @@ impl Compiler {
             flags: Vec::new(),
         })
     }
+    pub fn as_str(&self) -> &str {
+        self.cmd.as_ref()
+    }
     /// Creates a new instance from strings.
     pub fn new<S: AsRef<str>>(compiler: S, flags: &[S]) -> Result<Self, BuilderError> {
         let cmd = match compiler.as_ref() {

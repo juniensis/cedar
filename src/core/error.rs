@@ -55,7 +55,7 @@ impl Display for ManifestError {
                 let indent = str.last().unwrap().len();
                 writeln!(
                     f,
-                    "\n{}{}{}^\n{}|\n{}Error here",
+                    "\n{}{}\n{}^\n{}|\n{}Error here",
                     str.join("\n"),
                     last,
                     " ".repeat(indent),

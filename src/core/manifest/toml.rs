@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path, rc::Rc, string::ParseError};
+use std::{collections::HashMap, path::Path, process::exit, rc::Rc, string::ParseError};
 
 use crate::core::{error::ManifestError, utils::findbyte};
 
@@ -204,7 +204,10 @@ pub fn toml_parse(bytes: &[u8]) -> Vec<Table> {
         if window.len() == 2 {
             match Table::parse(window[0], window[1]) {
                 Ok(t) => tables.push(t),
-                Err(_) => todo!(),
+                Err(e) => {
+                    eprintln!("{e}");
+                    exit(1);
+                }
             };
         }
     }

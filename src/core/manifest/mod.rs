@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fs, io,
     path::{Path, PathBuf},
     process::Command,
     rc::Rc,
@@ -109,9 +110,24 @@ impl Manifest {
             deps,
         })
     }
+    pub fn new(name: &str) -> Result<Self, ManifestError> {
+        let compiler = Compiler::detect().unwrap();
+        let comp_str = compiler.as_str();
+        let manifest_str = manifest_with_name(name, comp_str);
+        Self::parse_str(&manifest_str)
+    }
+    pub fn write<P: AsRef<Path>>(&self, out: P) -> io::Result<()> {
+        fs::write(out, self.raw.as_bytes())
+    }
     pub fn compiler(&self) -> Result<Compiler, BuilderError> {
         Compiler::new(self.compiler.clone(), &self.cflags)
     }
+}
+
+fn manifest_with_name(name: &str, compiler: &str) -> String {
+    format!(
+        "[meta]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n[build]\ncompiler = \"{compiler}\"\ncflags = [\"-Wall\", \"-Wextra\"]\n"
+    )
 }
 
 #[cfg(test)]

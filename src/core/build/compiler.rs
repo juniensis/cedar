@@ -1,7 +1,7 @@
 use std::{
     fs, io,
     path::{Path, PathBuf},
-    process::{Command, ExitStatus},
+    process::{Child, Command, ExitStatus},
     rc::Rc,
 };
 
@@ -70,7 +70,7 @@ impl Compiler {
     /// -Wall and -Wextra):
     ///
     /// 'clang -MMD -MF dst.d -c -O2 -Iinclude -Wall -Wextra -o dst.o src'
-    pub fn compile<P: AsRef<Path>>(&self, src: P, dst: P) -> Result<String, BuilderError> {
+    pub fn compile<P: AsRef<Path>>(&self, src: P, dst: P) -> Result<(String, Child), BuilderError> {
         let src = src.as_ref();
         let name = src
             .file_name()
@@ -102,18 +102,9 @@ impl Compiler {
         );
 
         let command = command_str.split_ascii_whitespace().collect::<Vec<_>>();
-        let compile = Command::new(command[0])
-            .args(&command[1..])
-            .spawn()?
-            .wait()?;
+        let compile = Command::new(command[0]).args(&command[1..]).spawn()?;
 
-        if compile.success() {
-            Ok(command_str)
-        } else {
-            Err(BuilderError::CompileError(format!(
-                "Compiler failed to run, {command_str}"
-            )))
-        }
+        Ok((command_str, compile))
     }
     /// Links the given .o files into a binary specified by 'dst'.
     pub fn link<P: AsRef<Path>>(&self, objects: &[P], dst: &P) -> Result<String, BuilderError> {

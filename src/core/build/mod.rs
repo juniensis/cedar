@@ -53,10 +53,18 @@ impl Builder {
         })
     }
     pub fn build(&mut self) -> Result<(), BuilderError> {
+        let mut children = Vec::new();
         for cmp in self.graph.to_compile() {
             let dst = self.root.join("build").join(mangle(&cmp));
-            println!("{dst:?}");
-            self.compiler.compile(cmp, dst.into())?;
+            children.push(self.compiler.compile(cmp, dst.into())?);
+        }
+
+        for (cmd, mut chld) in children {
+            if !chld.wait()?.success() {
+                return Err(BuilderError::CompileError(format!(
+                    "Compiler failed to run {cmd}"
+                )));
+            }
         }
 
         self.graph.clean()?;

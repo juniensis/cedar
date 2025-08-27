@@ -72,4 +72,3 @@ Builder -> Build Graph -> Lock File Manager
 ## To-Do
 
 - Finish manifest error messages.
-- Read .d files.

@@ -41,9 +41,6 @@ pub fn init<P: AsRef<Path>>(path: P, git: bool) -> Result<(), CliError> {
     if !path.exists() {
         return Err(CliError::InitInNonExistentPath(format!("{path:?}")));
     }
-    if path.read_dir()?.next().is_some() {
-        return Err(CliError::InitInNonEmptyPath(format!("{path:?}")));
-    }
 
     manifest.write(path.join("cedar.toml"))?;
 
@@ -106,7 +103,7 @@ pub fn run<P: AsRef<Path>>(path: P) -> Result<(), BuilderError> {
         .wait()?;
 
     let elapsed = now.elapsed();
-    println!("\n  \x1b[1;32mFinished\x1b[0m in {:.2?}\n", elapsed);
+    println!("\n\n  \x1b[1;32mFinished\x1b[0m in {:.2?}\n", elapsed);
 
     Ok(())
 }

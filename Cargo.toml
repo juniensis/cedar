@@ -1,13 +1,10 @@
 [package]
 name = "cedar"
-version = "0.1.0"
+version = "0.2.1"
+authors = ["Jude Peel <juniensis@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/juniensis/cedar/"
+readme = "README.md"
 edition = "2024"
 
-[dependencies]
-
-[dev-dependencies]
-criterion = "0.7.0"
-
-[[bench]]
-name = "bench_misc"
-harness = false
+description = "A minimal C build system."

@@ -1,7 +1,0 @@
-[meta]
-name = "init_t"
-version = "0.1.0"
-
-[build]
-compiler = "clang"
-cflags = ["-Wall", "-Wextra"]

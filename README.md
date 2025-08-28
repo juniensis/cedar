@@ -8,10 +8,10 @@ A simple cargo-like C build system.
 
   Commands:
 
-  - new       Creates a new project under the given name.
-  - init      Creates a new project in the current working directory.
-  - build     Compiles the project.
-  -  run       Compiles then runs the project.
+  - new ->      Creates a new project under the given name.
+  - init ->     Creates a new project in the current working directory.
+  - build ->    Compiles the project.
+  -  run -> Compiles then runs the project.
 
   Options:
   - --git      Initializes the project as a git repository when created.

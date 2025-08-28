@@ -69,7 +69,7 @@ impl Builder {
     }
     pub fn build(&mut self) -> Result<(), BuilderError> {
         if !self.graph.to_compile().is_empty() {
-            println!("\n    \x1b[1;32mCompiling\x1b[0m",);
+            println!("    \x1b[1;32mCompiling\x1b[0m",);
         }
 
         let mut children = Vec::new();
@@ -90,7 +90,7 @@ impl Builder {
         self.graph.clean()?;
 
         if !self.graph.to_link().is_empty() {
-            println!("\n    \x1b[1;32mLinking\x1b[0m");
+            println!("    \x1b[1;32mLinking\x1b[0m");
             let link = self
                 .graph
                 .to_link()

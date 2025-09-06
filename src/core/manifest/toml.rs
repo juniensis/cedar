@@ -27,10 +27,16 @@ impl Value {
                 return Value::List(Vec::new());
             }
             let trimmed = source
-                .trim_start_matches("[\"")
-                .trim_end_matches("\"]")
+                .trim_start_matches("[")
+                .trim_end_matches("]")
                 .split(',')
-                .map(|mem| Value::parse(mem.trim().trim_matches('"')))
+                .filter_map(|mem| {
+                    if !mem.is_empty() {
+                        Some(Value::parse(mem.trim().trim_matches('"')))
+                    } else {
+                        None
+                    }
+                })
                 .collect::<Vec<_>>();
 
             Self::List(trimmed)
@@ -135,29 +141,44 @@ impl Table {
                 //     ^- xptr
                 xptr = tfindbyte(yptr, b'=', end)?.add(1);
                 yptr = tfindbyte(yptr, b'\n', end)?;
-                // Trim whitespace again.
-                let val_len = loop {
-                    xrdr = *xptr;
-                    yrdr = *yptr;
-                    if yptr <= xptr {
-                        return Err(ManifestError::ParseError(ptr, xptr, end));
-                    }
-                    match (xrdr > 32, yrdr > 32) {
-                        (true, true) => break yptr.add(1) as usize - xptr as usize,
-                        (false, true) => xptr = xptr.add(1),
-                        (true, false) => yptr = yptr.sub(1),
-                        (false, false) => {
-                            xptr = xptr.add(1);
-                            yptr = yptr.sub(1);
+
+                if *xptr.add(1) == b'[' {
+                    yptr = tfindbyte(yptr, b']', end)?.add(1);
+                    let val_str = str::from_utf8_unchecked(std::slice::from_raw_parts(
+                        xptr,
+                        yptr.offset_from_unsigned(xptr),
+                    ));
+                    let parsed = val_str.lines().map(|x| x.trim()).collect::<String>();
+                    let val = Value::parse(&parsed);
+                    kv.insert(key, val);
+
+                    xptr = yptr;
+                } else {
+                    // Trim whitespace again.
+                    let val_len = loop {
+                        xrdr = *xptr;
+                        yrdr = *yptr;
+                        if yptr < xptr {
+                            println!("err");
+                            return Err(ManifestError::ParseError(ptr, xptr, end));
                         }
-                    }
-                };
+                        match (xrdr > 32, yrdr > 32) {
+                            (true, true) => break yptr.add(1) as usize - xptr as usize,
+                            (false, true) => xptr = xptr.add(1),
+                            (true, false) => yptr = yptr.sub(1),
+                            (false, false) => {
+                                xptr = xptr.add(1);
+                                yptr = yptr.sub(1);
+                            }
+                        }
+                    };
 
-                let val = Value::parse(str::from_utf8_unchecked(std::slice::from_raw_parts(
-                    xptr, val_len,
-                )));
+                    let val = Value::parse(str::from_utf8_unchecked(std::slice::from_raw_parts(
+                        xptr, val_len,
+                    )));
 
-                kv.insert(key, val);
+                    kv.insert(key, val);
+                }
             }
         }
 
@@ -223,7 +244,7 @@ pub fn toml_parse_file<P: AsRef<Path>>(path: P) -> std::io::Result<Vec<Table>> {
 #[cfg(test)]
 mod core_manifest_toml_t {
     use core::panic;
-    use std::error::Error;
+    use std::{error::Error, fs};
 
     use crate::core::manifest::{
         EXAMPLE_MANIFEST,
@@ -258,6 +279,13 @@ mod core_manifest_toml_t {
             ))
             .as_ref()
         );
+    }
+
+    #[test]
+    fn parse_multi_line_t() {
+        let table = fs::read("/home/june/repo/malloc/cedar.toml").unwrap();
+        let parsed = toml_parse(&table);
+        println!("{parsed:?}");
     }
 
     #[test]

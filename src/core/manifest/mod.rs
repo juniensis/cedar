@@ -22,6 +22,7 @@ version = "0.1.0"
 [build]
 compiler = "clang"
 cflags = ["-Wall", "-Wextra"]
+ldflags = [""]
 
 [dependencies]
 todo = "include/todo"
@@ -34,6 +35,7 @@ pub struct Manifest {
     pub version: Option<Rc<str>>,
     compiler: Rc<str>,
     cflags: Vec<Rc<str>>,
+    ldflags: Vec<Rc<str>>,
     deps: Option<HashMap<Rc<str>, PathBuf>>,
 }
 
@@ -47,6 +49,7 @@ impl Manifest {
         let mut version: Option<Rc<str>> = Default::default();
         let mut compiler: Rc<str> = Default::default();
         let mut cflags: Vec<Rc<str>> = Vec::new();
+        let mut ldflags: Vec<Rc<str>> = Vec::new();
         let mut deps: Option<HashMap<Rc<str>, PathBuf>> = None;
         for table in tables {
             if table.name == "meta".into() {
@@ -86,6 +89,20 @@ impl Manifest {
                         })
                         .collect();
                 }
+                if let Some(ldflgs) = table.get("ldflags")
+                    && let Value::List(ldf) = ldflgs
+                {
+                    ldflags = ldf
+                        .iter()
+                        .filter_map(|val| {
+                            if let Value::String(v) = val {
+                                Some(Rc::from(v.as_str()))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                }
             } else if table.name == "dependencies".into() {
                 let mut d = HashMap::new();
                 for (dep, path) in table.iter() {
@@ -107,6 +124,7 @@ impl Manifest {
             version,
             compiler,
             cflags,
+            ldflags,
             deps,
         })
     }
@@ -120,13 +138,13 @@ impl Manifest {
         fs::write(out, self.raw.as_bytes())
     }
     pub fn compiler(&self) -> Result<Compiler, BuilderError> {
-        Compiler::new(self.compiler.clone(), &self.cflags)
+        Compiler::new(self.compiler.clone(), &self.cflags, &self.ldflags)
     }
 }
 
 fn manifest_with_name(name: &str, compiler: &str) -> String {
     format!(
-        "[meta]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n[build]\ncompiler = \"{compiler}\"\ncflags = [\"-Wall\", \"-Wextra\"]\n"
+        "[meta]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n[build]\ncompiler = \"{compiler}\"\ncflags = [\"-Wall\", \"-Wextra\"]\nldflags = [\"-lm\"]\n"
     )
 }
 

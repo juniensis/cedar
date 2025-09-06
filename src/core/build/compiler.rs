@@ -11,6 +11,7 @@ use crate::core::{error::BuilderError, manifest::Manifest, utils::which};
 pub struct Compiler {
     cmd: Rc<str>,
     flags: Vec<Rc<str>>,
+    ldflags: Vec<Rc<str>>,
 }
 
 impl Compiler {
@@ -33,13 +34,18 @@ impl Compiler {
         Ok(Self {
             cmd,
             flags: Vec::new(),
+            ldflags: Vec::new(),
         })
     }
     pub fn as_str(&self) -> &str {
         self.cmd.as_ref()
     }
     /// Creates a new instance from strings.
-    pub fn new<S: AsRef<str>>(compiler: S, flags: &[S]) -> Result<Self, BuilderError> {
+    pub fn new<S: AsRef<str>>(
+        compiler: S,
+        flags: &[S],
+        ldflags: &[S],
+    ) -> Result<Self, BuilderError> {
         let cmd = match compiler.as_ref() {
             "clang" => Rc::from(compiler.as_ref()),
             "gcc" => Rc::from(compiler.as_ref()),
@@ -51,22 +57,37 @@ impl Compiler {
             .map(|flag| Rc::<str>::from(flag.as_ref()))
             .collect::<Vec<_>>();
 
+        let ldflags = ldflags
+            .iter()
+            .map(|flag| Rc::<str>::from(flag.as_ref()))
+            .collect::<Vec<_>>();
+
         Ok(Self {
             cmd,
             flags: owned_flags,
+            ldflags,
         })
     }
     /// Autodetect compiler, and create an instance withh the given flags.
-    pub fn with_flags<S: AsRef<str>>(flags: &[S]) -> Result<Self, BuilderError> {
+    pub fn with_flags<S: AsRef<str>>(flags: &[S], ldflags: &[S]) -> Result<Self, BuilderError> {
         let mut ret = Self::detect()?;
-        ret.flags = flags.iter().map(|x| Rc::from(x.as_ref())).collect();
+        ret.flags = flags.iter().map(|x| Rc::<str>::from(x.as_ref())).collect();
+        ret.ldflags = ldflags
+            .iter()
+            .map(|flag| Rc::<str>::from(flag.as_ref()))
+            .collect::<Vec<_>>();
+
         Ok(ret)
     }
     /// Add flags to an existing compiler.
-    pub fn add_flags<S: AsRef<str>>(&mut self, flags: &[S]) {
+    pub fn add_flags<S: AsRef<str>>(&mut self, flags: &[S], ldflags: &[S]) {
         for flag in flags {
-            let str = Rc::from(flag.as_ref());
+            let str = Rc::<str>::from(flag.as_ref());
             self.flags.push(str);
+        }
+        for ldflag in ldflags {
+            let str = Rc::<str>::from(ldflag.as_ref());
+            self.ldflags.push(str);
         }
     }
     /// Compile a file. Runs the following command (if clang is used with
@@ -81,14 +102,16 @@ impl Compiler {
             .ok_or(io::Error::last_os_error())?;
 
         if !src.exists() {
-            return Err(BuilderError::CompileError(format!(
-                "attempted to compile non-existent file '{name}'"
+            return Err(BuilderError::CompileError((
+                format!("attempted to compile non-existent file '{name}'"),
+                dst.as_ref().with_file_name("build/"),
             )));
         }
 
         if !name.ends_with(".c") {
-            return Err(BuilderError::CompileError(format!(
-                "attempted to compile '{name}' which lacks the '.c' file extension."
+            return Err(BuilderError::CompileError((
+                format!("attempted to compile '{name}' which lacks the '.c' file extension."),
+                dst.as_ref().with_file_name("build/"),
             )));
         }
 
@@ -117,19 +140,23 @@ impl Compiler {
                 fs::create_dir_all(par)?;
             }
         } else {
-            return Err(BuilderError::CompileError(format!(
-                "Invalid destination path: {dst:?}"
+            return Err(BuilderError::CompileError((
+                format!("Invalid destination path: {dst:?}"),
+                dst.with_file_name("build/"),
             )));
         }
 
+        let lflags = self.ldflags.join(" ");
+
         let command_str = format!(
-            "{} -o {} {} -lm",
+            "{} {} -o {} {}",
             self.cmd,
+            lflags,
             dst.to_string_lossy(),
             objects
                 .iter()
                 .map(|x| format!("{}.o ", x.as_ref().to_string_lossy()))
-                .collect::<String>()
+                .collect::<String>(),
         );
 
         let command = command_str.split_ascii_whitespace().collect::<Vec<_>>();
@@ -141,8 +168,9 @@ impl Compiler {
         if link.success() {
             Ok(command_str)
         } else {
-            Err(BuilderError::CompileError(format!(
-                "Linker failed to run, {command_str}"
+            Err(BuilderError::CompileError((
+                format!("Linker failed to run, {command_str}"),
+                dst.with_file_name("build/"),
             )))
         }
     }

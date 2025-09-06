@@ -1,7 +1,7 @@
 use std::{env, fs, path::PathBuf};
 
 use crate::cli::{
-    commands::{build, help, init, new, run},
+    commands::{build, clean, help, init, new, run},
     error::CliError,
 };
 
@@ -19,6 +19,7 @@ pub enum Command {
     Build,
     Run,
     Help,
+    Clean,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -55,6 +56,7 @@ impl Args {
                 (0, "build") => cli.command = Command::Build,
                 (0, "run") => cli.command = Command::Run,
                 (0, "help") => cli.command = Command::Help,
+                (0, "clean") => cli.command = Command::Clean,
                 (_, "--git" | "-g") => cli.flags.push(Flag::Git),
                 (0, _) => {
                     help();
@@ -73,6 +75,7 @@ impl Args {
             Command::New => new(&self.path, git)?,
             Command::Build => build(&self.path)?,
             Command::Run => run(&self.path)?,
+            Command::Clean => clean(&self.path)?,
             Command::Help => help(),
         }
         Ok(())

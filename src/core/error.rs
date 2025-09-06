@@ -73,7 +73,7 @@ impl Error for ManifestError {}
 pub enum BuilderError {
     FailedToDetectCompiler,
     InvalidCompiler(String),
-    CompileError(String),
+    CompileError((String, PathBuf)),
     IoError(io::Error),
     NoManifest(String),
     ManifestError(ManifestError),
@@ -91,7 +91,7 @@ impl Display for BuilderError {
                 f,
                 "BuilderError: Given invalid compiler '{c}', currently only clang and gcc are supported."
             ),
-            Self::CompileError(e) => writeln!(f, "BuilderError: Failed to compile, {e}"),
+            Self::CompileError((e, _)) => writeln!(f, "BuilderError: Failed to compile, {e}"),
             Self::IoError(e) => writeln!(f, "{e}"),
             Self::NoManifest(s) => writeln!(f, "BuilderError: No Cedar manifest in the path {s}."),
             Self::ManifestError(e) => write!(f, "BuilderError: {e}"),

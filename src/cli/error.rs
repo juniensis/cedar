@@ -31,7 +31,7 @@ impl Display for CliError {
             Self::ManifestError(m) => {
                 writeln!(f, "CliError: Failed to generate or parse manifest, {m}")
             }
-            Self::BuilderError(e) => writeln!(f, "ClieError: Failed during build, {e}"),
+            Self::BuilderError(e) => writeln!(f, "CliError: Failed during build, {e}"),
         }
     }
 }

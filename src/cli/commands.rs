@@ -15,6 +15,7 @@ pub fn help() {
   \x1b[1;32mCommands:\x1b[0m
     \x1b[1m new      \x1b[0m Creates a new project under the given name.
     \x1b[1m init     \x1b[0m Creates a new project in the current working directory.
+    \x1b[1m clean    \x1b[0m Deletes all temporary build files.
     \x1b[1m build    \x1b[0m Compiles the project.
     \x1b[1m run      \x1b[0m Compiles then runs the project.
 
@@ -96,15 +97,30 @@ pub fn run<P: AsRef<Path>>(path: P) -> Result<(), BuilderError> {
         "  \x1b[1;32mRunning\x1b[0m {}",
         bin_dir.file_name().unwrap_or_default().to_string_lossy()
     );
-    println!();
     process::Command::new(bin_dir.to_string_lossy().as_ref())
         .spawn()
         .expect("Error: Failed to run executable.")
         .wait()?;
 
     let elapsed = now.elapsed();
-    println!("\n\n  \x1b[1;32mFinished\x1b[0m in {:.2?}\n", elapsed);
+    println!("\n  \x1b[1;32mFinished\x1b[0m in {:.2?}\n", elapsed);
 
+    Ok(())
+}
+
+pub fn clean<P: AsRef<Path>>(path: P) -> Result<(), BuilderError> {
+    let builddir = path.as_ref().join("build");
+    if builddir.exists() {
+        for entry in builddir.read_dir()?.flatten() {
+            let p = entry.path();
+            match p.extension().and_then(|x| x.to_str()) {
+                Some("o") => fs::remove_file(&p)?,
+                Some("d") => fs::remove_file(&p)?,
+                Some("lock") => fs::remove_file(&p)?,
+                _ => {}
+            };
+        }
+    }
     Ok(())
 }
 

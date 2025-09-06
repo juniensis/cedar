@@ -81,8 +81,9 @@ impl Builder {
 
         for (cmd, mut chld) in children {
             if !chld.wait()?.success() {
-                return Err(BuilderError::CompileError(format!(
-                    "Compiler failed to run {cmd}"
+                return Err(BuilderError::CompileError((
+                    format!("Compiler failed to run {cmd}"),
+                    self.build_dir.clone(),
                 )));
             }
         }

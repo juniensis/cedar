@@ -81,7 +81,7 @@ impl BuildGraph {
         self.compile.iter().cloned().collect()
     }
     pub fn to_link(&self) -> Vec<Rc<Path>> {
-        if self.compile.is_empty() {
+        if self.to_compile().is_empty() {
             Vec::new()
         } else {
             self.objs.iter().cloned().collect()

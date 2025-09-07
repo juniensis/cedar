@@ -314,6 +314,16 @@ mod core_build_lock_t {
         manifest::toml::toml_parse,
     };
 
+    #[test]
+    fn lock_bug_t() {
+        let lock = fs::read("/home/june/repo/malloc/build/cedar.lock").unwrap();
+        let l = LockFile::deserialize(
+            PathBuf::from("/home/june/repo/malloc/build/cedar.lock"),
+            &lock,
+        )
+        .unwrap();
+    }
+
     #[ignore = "Sleeps"]
     #[test]
     fn lock_bools_t() {

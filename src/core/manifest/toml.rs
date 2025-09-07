@@ -143,7 +143,7 @@ impl Table {
                 yptr = tfindbyte(yptr, b'\n', end)?;
 
                 if *xptr.add(1) == b'[' {
-                    yptr = tfindbyte(yptr, b']', end)?.add(1);
+                    yptr = tfindbyte(xptr, b']', end)?.add(1);
                     let val_str = str::from_utf8_unchecked(std::slice::from_raw_parts(
                         xptr,
                         yptr.offset_from_unsigned(xptr),

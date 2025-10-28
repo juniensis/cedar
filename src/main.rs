@@ -5,20 +5,23 @@ use cedar::{
     core::error::BuilderError,
 };
 
-fn main() -> Result<(), CliError> {
+fn main() {
     let args = match Args::get() {
         Ok(a) => a,
         Err(e) => {
             print!("{e}");
             if let CliError::BuilderError(BuilderError::CompileError((_, p))) = e {
-                println!("CLEANING");
+                println!("Unexpected failure! Cleaning up.");
                 clean(p.parent().unwrap()).unwrap();
                 exit(1);
             } else {
-                println!("NOT");
+                println!("Unexpected failure!");
                 exit(1);
             }
         }
     };
-    args.exec()
+    match args.exec() {
+        Ok(_) => (),
+        Err(e) => eprintln!("{e}"),
+    }
 }

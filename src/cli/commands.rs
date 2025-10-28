@@ -21,6 +21,8 @@ pub fn help() {
 
   \x1b[1;32mOptions:\x1b[0m
     \x1b[1m --git     \x1b[0m Initializes the project as a git repository when created.
+        
+  (v0.2.2)
 "
     );
 }

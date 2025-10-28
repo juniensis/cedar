@@ -26,7 +26,7 @@ impl Compiler {
         } else if which("clang").is_some() {
             Rc::from("clang")
         } else if which("gcc").is_some() {
-            Rc::from("clang")
+            Rc::from("gcc")
         } else {
             return Err(BuilderError::FailedToDetectCompiler);
         };
@@ -46,11 +46,16 @@ impl Compiler {
         flags: &[S],
         ldflags: &[S],
     ) -> Result<Self, BuilderError> {
-        let cmd = match compiler.as_ref() {
+        let cmd: Rc<str> = match compiler.as_ref() {
             "clang" => Rc::from(compiler.as_ref()),
             "gcc" => Rc::from(compiler.as_ref()),
             _ => return Err(BuilderError::InvalidCompiler(compiler.as_ref().to_string())),
         };
+
+        // Validate that the compiler exists.
+        if which(cmd.as_ref()).is_none() {
+            return Err(BuilderError::InvalidCompiler(cmd.as_ref().to_string()));
+        }
 
         let owned_flags = flags
             .iter()

@@ -1,6 +1,6 @@
 [package]
 name = "cedar"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Jude Peel <juniensis@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/juniensis/cedar/"
